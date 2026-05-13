@@ -6,7 +6,7 @@ le bus du controleur P23B32 (V2, 2019). Le P23B32 ne valide pas le CRC,
 donc les trames capturees peuvent etre rejouees directement.
 
 Protocole observe :
-- Bus RS485, 9600 baud 8N1 (mode passif/lecture) et envoi command frames
+- Bus RS485, 38400 baud 8N1 (mesure oscilloscope KDy : 26us/bit)
 - Delimiteurs : 0x1A (debut) / 0x1D (fin)
 - Byte 5 : type de trame (0xA1 = commande equipement, 0xA4 = filtration,
   0xAA = arret total)
