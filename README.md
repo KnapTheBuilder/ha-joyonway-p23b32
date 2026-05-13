@@ -58,7 +58,7 @@ L'integration cree un device unique `Joyonway P23B32` avec 10 entites `button` :
 |Tout eteindre|Coupe tous les equipements|
 
 Le chauffage est asservi a une consigne thermostat. Une fonction
-`build\_consigne\_frame(temp\_f)` est exposee dans `rs485.py` pour generer
+`build\\\\\\\_consigne\\\\\\\_frame(temp\\\\\\\_f)` est exposee dans `rs485.py` pour generer
 dynamiquement la trame de consigne (60-104 F). Elle sera cablee a une
 entite `climate` dans une prochaine release.
 
@@ -88,10 +88,10 @@ porte le type de trame.
 |Arret total|`0xAA`|Coupe tout en une trame courte|
 
 Toutes les trames hex completes sont dans
-[`custom\_components/joyonway\_p23b32/rs485.py`](custom_components/joyonway_p23b32/rs485.py).
+[`custom\\\\\\\_components/joyonway\\\\\\\_p23b32/rs485.py`](custom_components/joyonway_p23b32/rs485.py).
 
 Chaque commande est envoyee 10 fois a 0.5 s d'intervalle (configurable dans
-`const.py` via `REPEAT\_COUNT` et `REPEAT\_INTERVAL`). Cette redondance
+`const.py` via `REPEAT\\\\\\\_COUNT` et `REPEAT\\\\\\\_INTERVAL`). Cette redondance
 compense les eventuelles collisions sur le bus RS485.
 
 ## Cartes Lovelace et automatisations
@@ -102,7 +102,7 @@ Le dashboard montre en exemple ci-dessus (style "dark neon") combine :
 actionneurs (lumiere, filtration, chauffage), boutons ON/OFF par
 equipement, marche generale, arret total + relance filtre
 * Une carte programmation avec creneaux filtration (05h00-23h00) et
-chauffage (11h30-13h00, 14h00-15h00), pilotee par un `input\_boolean`
+chauffage (11h30-13h00, 14h00-15h00), pilotee par un `input\\\\\\\_boolean`
 Programme Auto
 * Un suivi historique consommation (W) et temperature de l'eau
 
@@ -113,7 +113,7 @@ de chaque installation). Demande sur le forum HA si tu veux des exemples.
 
 * \[ ] Plateforme `climate` (consigne + lecture etat chauffage)
 * \[ ] Plateforme `sensor` (temperature eau via parsing des broadcasts)
-* \[ ] Plateforme `binary\_sensor` (etats equipements lus du bus)
+* \[ ] Plateforme `binary\\\\\\\_sensor` (etats equipements lus du bus)
 * \[ ] Plateforme `switch` (toggle stateful avec lecture etat reel)
 * \[ ] Coordinator polling RS485 pour exposer les etats live
 * \[ ] Tests unitaires sur les trames et le parsing
