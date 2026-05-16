@@ -1,7 +1,4 @@
 {
   "name": "Joyonway P23B32 Spa",
-  "render_readme": true,
-  "homeassistant": "2024.10.0",
-  "country": ["FR"],
-  "zip_release": false
+  "render_readme": true
 }

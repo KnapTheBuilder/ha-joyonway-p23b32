@@ -1,28 +1,8 @@
-# Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg-info/
-.eggs/
-
-# Virtual envs
-.venv/
-venv/
-env/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+*.pyc
+*.pyo
 .DS_Store
-Thumbs.db
-
-# HA dev
-.HA_VERSION
-home-assistant.log*
-secrets.yaml
+*.bak
+*.bak.*
+*.bak2
+*.bak_kdy

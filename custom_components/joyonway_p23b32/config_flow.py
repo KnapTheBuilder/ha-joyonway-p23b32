@@ -1,16 +1,11 @@
-# 2026-05-13 | Config flow | Saisie IP/port W610 et test de connexion TCP | Dépend: rs485.py, const.py
+# 2026-05-13 | Config flow | IP/port entry and TCP connection test | Depends: rs485.py, const.py
 """Config flow for Joyonway P23B32."""
-
 from __future__ import annotations
-
 import logging
 from typing import Any
-
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_PORT
-
 from .const import DEFAULT_HOST, DEFAULT_PORT, DOMAIN
 from .rs485 import test_connection
 
@@ -22,7 +17,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
     }
 )
-
 
 class JoyonwayP23B32ConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Joyonway P23B32."""
@@ -38,11 +32,8 @@ class JoyonwayP23B32ConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             host = user_input[CONF_HOST]
             port = user_input[CONF_PORT]
-
-            # Unicite : un seul config_entry par (host, port)
             await self.async_set_unique_id(f"{host}:{port}")
             self._abort_if_unique_id_configured()
-
             if await test_connection(host, port):
                 return self.async_create_entry(
                     title=f"Joyonway P23B32 ({host})",

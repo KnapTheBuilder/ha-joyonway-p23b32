@@ -1,25 +1,20 @@
-# 2026-05-13 | Constantes | Identifiants et cles de configuration | Dépend: aucune
 """Constants for the Joyonway P23B32 integration."""
-
 from __future__ import annotations
-
 DOMAIN: str = "joyonway_p23b32"
-
-# Cles de configuration
+# Configuration keys
 CONF_HOST: str = "host"
 CONF_PORT: str = "port"
-
-# Valeurs par defaut (USR-W610 standard)
+# Default values (USR-W610 standard)
 DEFAULT_HOST: str = "192.168.1.34"
 DEFAULT_PORT: int = 8899
 DEFAULT_NAME: str = "Joyonway P23B32"
-
-# Comportement RS485
+# RS485 behaviour
 REPEAT_COUNT: int = 10
 REPEAT_INTERVAL: float = 0.5
 TCP_TIMEOUT: float = 5.0
-
-# Identifiants des commandes confirmees
+# Coordinator polling - broadcast read every X seconds
+SCAN_INTERVAL: int = 40
+# Confirmed command identifiers
 CMD_LUMIERE_ON: str = "lumiere_on"
 CMD_LUMIERE_OFF: str = "lumiere_off"
 CMD_POMPE_GAUCHE_ON: str = "pompe_gauche_on"
@@ -31,6 +26,5 @@ CMD_BULLEUR_OFF: str = "bulleur_off"
 CMD_FILTRATION: str = "filtration"
 CMD_ALL_OFF: str = "all_off"
 CMD_CONSIGNE: str = "consigne"
-
-# Plateformes chargees
-PLATFORMS: list[str] = ["button"]
+# Loaded platforms
+PLATFORMS: list[str] = ["button", "sensor", "binary_sensor"]

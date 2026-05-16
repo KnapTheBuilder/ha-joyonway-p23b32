@@ -1,124 +1,127 @@
-<p align="center">
-  <img src="docs/images/logo.png" alt="Joyonway P23B32 logo" width="120"/>
-</p>
+# ha-joyonway-p23b32
 
-# Joyonway P23B32 Spa - Home Assistant integration
+Home Assistant custom integration for the **Joyonway P23B32** spa controller via RS485 over a **USR-W610** WiFi bridge.
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/)
-[![Validate with hassfest](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/hassfest.yml/badge.svg)](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/hassfest.yml)
-[![HACS Validation](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/validate.yml/badge.svg)](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/validate.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+Developed and tested by [@KnapTheBuilder](https://github.com/KnapTheBuilder), with contributions from [@KDy](https://community.home-assistant.io/u/kdy) and [@Gaet78](https://community.home-assistant.io/u/gaet78).
 
-Integration Home Assistant pour la centrale de spa **Joyonway P23B32** (V2, 2019)
-pilotee **localement** en RS485 via un pont **USR-W610** (TCP/IP vers serie).
+Discussion thread: [JoyOnWay Spa Control — HA Community](https://community.home-assistant.io/t/joyonway-spa-control/582344)
 
-Reverse engineering du protocole effectue par capture de trames sur le bus
-RS485 entre le controleur P23B32 et l'app officielle Joyonway. Le controleur
-ne valide pas le CRC : les trames capturees sont rejouees telles quelles
-avec un excellent taux de reussite.
+---
 
-## Apercu
+## Requirements
 
-| Equipements | Programmation | Monitoring |
-|---|---|---|
-| ![Dashboard equipements](docs/images/dashboard-equipements.png) | ![Programmation](docs/images/dashboard-programmation.png) | ![Monitoring](docs/images/dashboard-monitoring.png) |
-
-## Materiel requis
-
-| Element | Reference / valeur |
+| Item | Details |
 |---|---|
-| Centrale spa | Joyonway P23B32 (testee V2, 2019) |
-| Pont RS485/TCP | USR-W610 en mode TCP server |
-| Home Assistant | Core, OS ou Supervised >= 2024.10 |
-| HACS | Installe |
+| Spa controller | Joyonway P23B32 (physically validated) |
+| RS485 bridge | USR-W610 (WiFi, TCP Server mode, port 8899) |
+| Home Assistant | 2024.1.0 or later |
+| Python | 3.12+ (Python 3.14 asyncio fix included) |
 
-### Configuration USR-W610 attendue
+---
 
-| Parametre | Valeur |
-|---|---|
-| Mode | TCP Server |
-| Port local TCP | 8899 |
-| Baudrate | 38400 |
-| Data bits | 8 |
-| Stop bits | 1 |
-| Parity | None |
-| Flow control | None |
+## Hardware wiring
 
-## Commandes exposees
+> **Warning: Opening the spa electrical enclosure is done at your own risk. Always cut the power before any intervention.**
 
-L'integration cree un device unique `Joyonway P23B32` avec 10 entites `button` :
+The USR-W610 connects to the RS485 bus inside the spa controller box:
 
-| Bouton | Action |
-|---|---|
-| Lumiere ON / OFF | Eclairage LED |
-| Pompe gauche ON / OFF | Pompe jets gauche |
-| Pompe droite ON / OFF | Pompe jets droite |
-| Bulleur ON / OFF | Air blower |
-| Filtration | Mise a jour planning filtration |
-| Tout eteindre | Coupe tous les equipements |
+```
+Spa P23B32 RS485 bus  <-->  USR-W610 terminals A / B
+```
 
-Le chauffage est asservi a une consigne thermostat. Une fonction
-<code>build_consigne_frame(temp_f)</code> est exposee dans <code>rs485.py</code> pour generer
-dynamiquement la trame de consigne (60-104 F). Elle sera cablee a une
-entite `climate` dans une prochaine release.
+Configure the USR-W610 in **TCP Server** mode, port **8899**, baud rate **9600**, 8N1.
 
-## Installation via HACS (custom repository)
+---
 
-1. HACS > menu trois points > **Custom repositories**
-2. URL : `https://github.com/KnapTheBuilder/ha-joyonway-p23b32` - Categorie : `Integration`
-3. **Add** puis cherche "Joyonway P23B32" dans HACS, installe-la
-4. Redemarre Home Assistant
+## Installation
+
+### Via HACS (recommended)
+
+1. In HACS, go to **Integrations** and click the three dots in the top right.
+2. Select **Custom repositories**.
+3. Add `https://github.com/KnapTheBuilder/ha-joyonway-p23b32` with category **Integration**.
+4. Install **Joyonway P23B32 Spa**.
+5. Restart Home Assistant.
+
+### Manual
+
+Copy the `custom_components/joyonway_p23b32` folder into your HA `config/custom_components/` directory and restart.
+
+---
 
 ## Configuration
 
-1. **Settings > Devices and services > Add integration**
-2. Cherche **Joyonway P23B32**
-3. Saisis l'IP et le port du USR-W610 (par defaut `192.168.1.34:8899`)
-4. Valide. Les boutons apparaissent sous le device `Joyonway P23B32`
+After restart, go to **Settings > Devices & Services > Add integration** and search for **Joyonway**.
 
-## Protocole reverse-engineered (synthese)
+Enter:
+- **IP address**: IP of your USR-W610 on your local network
+- **TCP port**: `8899` (default)
 
-Les trames sont delimitees par `0x1A` (debut) et `0x1D` (fin). Le byte 5
-porte le type de trame.
+---
 
-| Type | Byte 5 | Usage |
+## Entities created
+
+### Sensors
+
+| Entity | Description | Unit |
 |---|---|---|
-| Commande equipement | `0xA1` | Lumiere, pompes, bulleur, consigne |
-| Filtration / planning | `0xA4` | Mise a jour planning |
-| Arret total | `0xAA` | Coupe tout en une trame courte |
+| `sensor.joyonway_p23b32_water_temperature` | Current water temperature | °C |
+| `sensor.joyonway_p23b32_setpoint` | Target temperature setpoint | °C |
 
-Toutes les trames hex completes sont dans
-[<code>custom_components/joyonway_p23b32/rs485.py</code>](custom_components/joyonway_p23b32/rs485.py).
+### Binary sensors
 
-Chaque commande est envoyee 10 fois a 0.5 s d'intervalle (configurable dans
-<code>const.py</code> via <code>REPEAT_COUNT</code> et <code>REPEAT_INTERVAL</code>). Cette redondance
-compense les eventuelles collisions sur le bus RS485.
+| Entity | Description |
+|---|---|
+| `binary_sensor.joyonway_p23b32_filtration` | Filtration pump active |
+| `binary_sensor.joyonway_p23b32_pompe_gauche` | Left jets pump |
+| `binary_sensor.joyonway_p23b32_pompe_droite` | Right jets pump |
+| `binary_sensor.joyonway_p23b32_bulleur` | Blower (air bubbles) |
+| `binary_sensor.joyonway_p23b32_lumiere` | Light |
+| `binary_sensor.joyonway_p23b32_chauffage` | Heater active |
+| `binary_sensor.joyonway_p23b32_w610_connection` | USR-W610 connectivity |
 
-## Cartes Lovelace et automatisations
+### Buttons (one-shot commands)
 
-Le dashboard montre en exemple ci-dessus (style "dark neon") combine :
+| Entity | Action |
+|---|---|
+| Light ON / Light OFF | Toggle light |
+| Left jets ON / OFF | Toggle left pump |
+| Right jets ON / OFF | Toggle right pump |
+| Blower ON / OFF | Toggle blower |
+| Filtration | Start filtration cycle |
+| All OFF | Emergency stop (all equipment) |
 
-- Une carte equipements avec temperature eau / consigne, etat des
-  actionneurs (lumiere, filtration, chauffage), boutons ON/OFF par
-  equipement, marche generale, arret total + relance filtre
-- Une carte programmation avec creneaux filtration (05h00-23h00) et
-  chauffage (11h30-13h00, 14h00-15h00), pilotee par un <code>input_boolean</code>
-  Programme Auto
-- Un suivi historique consommation (W) et temperature de l'eau
+---
 
-Les YAML correspondants ne sont pas dans ce repo (specifiques aux entites
-de chaque installation). Demande sur le forum HA si tu veux des exemples.
+## Protocol details
 
-## Roadmap
+The integration communicates directly over TCP with the USR-W610, which bridges to the spa's RS485 bus.
 
-- [ ] Plateforme <code>climate</code> (consigne + lecture etat chauffage)
-- [ ] Plateforme <code>sensor</code> (temperature eau via parsing des broadcasts)
-- [ ] Plateforme <code>binary_sensor</code> (etats equipements lus du bus)
-- [ ] Plateforme <code>switch</code> (toggle stateful avec lecture etat reel)
-- [ ] Coordinator polling RS485 pour exposer les etats live
-- [ ] Tests unitaires sur les trames et le parsing
-- [ ] Traductions DE, ES, IT
+**Broadcast frame** (emitted by the spa controller every ~30s):
 
-## Avertissements
+| Byte (from signature) | Content |
+|---|---|
+| 9 | Water temperature in °F |
+| 12 | Pump byte 1: bit 0x04=left jets, bit 0x10=right jets |
+| 14 | Pump byte 2: bit 0x01=filtration, bit 0x08=blower, bit 0x10=heater |
+| 16 | Setpoint in °F |
+| 17 | Light byte: bit 0x01=light |
 
-- **Reverse engineering commun​​​​​​​​​​​​​​​​
+Frame signature: `1A FF 01 3C D2 B4 FF 08 02`
+
+**Ozonator byte**: not yet identified. If you have a P23B32 with ozonator and can capture RS485 frames, please open an issue.
+
+---
+
+## Known limitations
+
+- Ozonator / UV sanitizer state: not decoded (help welcome)
+- Filter schedule status: differs between manual and scheduled runs (bytes 34-36, under investigation)
+- RTSP camera: not supported by this integration
+- Tested only on P23B32 controller. Other Joyonway models may require protocol adaptation.
+
+---
+
+## License
+
+MIT
