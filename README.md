@@ -94,7 +94,7 @@ USR-W610 configuration:
 
 - Mode: **TCP Server**
 - Port: **8899**
-- Baud rate: **9600**
+- Baud rate: **34800**
 - Data format: **8N1**
 - Static DHCP lease recommended on your router for the W610
 
