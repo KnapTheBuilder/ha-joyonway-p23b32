@@ -1,0 +1,56 @@
+# ==========================================================================
+# Joyonway P23B32 - Setpoint command lock (30s)
+# Verrou consigne 30s - fix timing post-commande RS485
+# --------------------------------------------------------------------------
+# Credit / Credit:
+#   @Gaet78 - timing finding documented in his P69B133 HACS integration README
+#   @Gaet78 - decouverte du timing documentee dans le README de son
+#             integration HACS P69B133
+# Author / Auteur : @KnapTheBuilder
+# Date : 2026-05-17
+# ==========================================================================
+
+input_boolean:
+  spa_consigne_lock:
+    name: Spa consigne lock
+    icon: mdi:lock-clock
+
+automation:
+  - id: spa_verrou_consigne_30s
+    alias: "Spa - Setpoint lock 30s after command / Verrou consigne 30s"
+    description: >
+      EN: After any setpoint script runs, disable the climate-slider
+      feedback automation for 30s to prevent the controller's stale
+      broadcast from re-triggering the previous setpoint.
+      FR: Apres l'execution d'un script de consigne, desactive
+      l'automation de feedback slider climate pendant 30s pour eviter
+      que le broadcast obsolete du controleur ne re-declenche
+      l'ancienne consigne.
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id:
+          - script.spa_cmd_consigne_37
+          - script.spa_cmd_consigne_38
+          - script.spa_cmd_consigne_39
+          - script.spa_cmd_consigne_veille
+          - script.spa_cmd_consigne_hiver
+        to: "on"
+    actions:
+      - action: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.spa_consigne_lock
+      # EN: Replace below with YOUR slider-to-script automation entity_id
+      # FR: Remplacez ci-dessous par l'entity_id de VOTRE automation
+      #     slider-to-script
+      - action: automation.turn_off
+        target:
+          entity_id: automation.spa_slider_climate_declenche_script_consigne_2
+      - delay:
+          seconds: 30
+      - action: automation.turn_on
+        target:
+          entity_id: automation.spa_slider_climate_declenche_script_consigne_2
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.spa_consigne_lock
