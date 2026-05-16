@@ -117,7 +117,6 @@ Frame signature: `1A FF 01 3C D2 B4 FF 08 02`
 
 - Ozonator / UV sanitizer state: not decoded (help welcome)
 - Filter schedule status: differs between manual and scheduled runs (bytes 34-36, under investigation)
-- RTSP camera: not supported by this integration
 - Tested only on P23B32 controller. Other Joyonway models may require protocol adaptation.
 
 ---
