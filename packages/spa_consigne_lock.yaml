@@ -2,10 +2,29 @@
 # Joyonway P23B32 - Setpoint command lock (30s)
 # Verrou consigne 30s - fix timing post-commande RS485
 # --------------------------------------------------------------------------
+#
+#                          /!\ SAFETY WARNING /!\
+#
+# EN: Only replay frames captured from the physical control panel.
+#     NEVER craft a setpoint frame with an arbitrary or invalid CRC.
+#     @KDy reported on the HA Community thread that on his P25B85 a
+#     bad-CRC setpoint frame turned the heater ON unexpectedly. This is
+#     a real safety and financial risk. Capture, then replay.
+#
+# FR: Ne rejouer que des trames capturees depuis le panneau physique du
+#     spa. NE JAMAIS forger une trame consigne avec un CRC arbitraire
+#     ou invalide. @KDy a rapporte sur le forum HA Community que sur
+#     son P25B85, une trame consigne avec mauvais CRC a allume le
+#     chauffeur de maniere inattendue. C'est un vrai risque de
+#     securite et financier. Capturer, puis rejouer.
+#
+# --------------------------------------------------------------------------
 # Credit / Credit:
 #   @Gaet78 - timing finding documented in his P69B133 HACS integration README
 #   @Gaet78 - decouverte du timing documentee dans le README de son
 #             integration HACS P69B133
+#   @KDy   - CRC safety warning raised on the HA Community thread
+#   @KDy   - avertissement securite CRC souleve sur le thread HA Community
 # Author / Auteur : @KnapTheBuilder
 # Date : 2026-05-17
 # ==========================================================================
