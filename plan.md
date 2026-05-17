@@ -1,10 +1,12 @@
-# Joyonway Spa Integration Plan — Unified P25B85 / P23B32
+# Joyonway Spa Integration Plan — Unified RS485 / PB55x Controllers
 
 > **Goal:** A single Home Assistant integration supporting multiple Joyonway
-> controller models via model adapters, starting with read-only P25B85 support.
+> RS485/PB55x controller models via model adapters, starting with validated,
+> read-only P25B85 support.
 >
 > **Fork base:** `KnapTheBuilder/ha-joyonway-p23b32`
 > **Primary test hardware:** P25B85 + PB554 + Elfin EW11
+> **Preferred integration domain:** `joyonway_spa` (neutral multi-model domain)
 
 ---
 
@@ -61,17 +63,35 @@ of the broadcast frame (bytes 55+, datetime zone) is pseudo-escaped. Applying
 unescape to the whole frame breaks byte indexing. On P25B85, KDy applies
 unescape to the full frame successfully. Keep unescape scope per-model.
 
-### Frame structure (after unescaping)
+### Frame structure and indexing
+
+Terminology used in this plan:
+
+- **Raw/wire frame:** bytes exactly as received from TCP, including pseudo-escape
+  sequences such as `1B 11`.
+- **Logical frame:** frame after applying the selected model adapter's unescape
+  policy. Adapter byte maps are indexed against logical frames unless explicitly
+  stated otherwise.
+- **Important:** frame boundaries must be detected on raw bytes first, then the
+  adapter-specific unescape policy is applied. Do not unescape the continuous TCP
+  stream before finding `0x1A ... 0x1D` boundaries, because unescaping can
+  introduce interior delimiter bytes.
 
 ```
 byte[0]  = 0x1A (start)
 byte[1]  = destination address
 byte[2]  = source address
-byte[3]  = length (payload bytes, excluding last 4 bytes)
+byte[3]  = length-like field (often 0x3C for broadcasts; exact semantics TBD)
 byte[4..N] = payload
 byte[N+1..N+4] = CRC/checksum (4 bytes, algorithm unknown)
 byte[last] = 0x1D (end)
 ```
+
+⚠️ **Length validation caution:** The KDy sample has `byte[3] = 0x3C`, but the
+raw and fully-unescaped total byte counts do not yet cleanly prove the length
+formula. Initial validators should check delimiters, minimum size, model
+signature, and malformed escapes, but should not reject otherwise-plausible
+frames solely because an assumed length formula fails.
 
 ### Bus cycle (~50ms per frame, 12 frames per cycle)
 
@@ -86,6 +106,10 @@ Master (0x01) polls in order:
 
 ### Broadcast frame (0xFF) — P25B85 byte map
 
+All indexes below are intended to be **logical-frame indexes after the P25B85
+full-frame unescape policy**. Local captures must validate this map before it is
+used by the Home Assistant adapter.
+
 Reference frame from KDy (post #74), 0-indexed from `0x1A`:
 
 ```
@@ -94,58 +118,68 @@ Reference frame from KDy (post #74), 0-indexed from `0x1A`:
 11 1D
 ```
 
-| Byte      | Content                    | Notes (KDy P25B85)                                                             |
-|-----------|----------------------------|--------------------------------------------------------------------------------|
-| 0         | `0x1A`                     | Start                                                                          |
-| 1         | `0xFF`                     | Broadcast address                                                              |
-| 2         | `0x01`                     | Master address                                                                 |
-| 3         | `0x3C`                     | Length                                                                         |
-| 4–8       | `D2 B4 FF 08 03`           | Header (byte 8 = `0x03` for P25B85, `0x02` for P23B32)                         |
-| **9**     | **Water temperature (°F)** | `0x5E` = 94°F = 34.4°C                                                         |
-| 10–11     | `0x04 0x06`                | Unknown                                                                        |
-| 12        | Unknown                    | P23B32 uses this for jets, but P25B85 meaning differs                          |
-| **13**    | **Pump status**            | `0x02` = filtration (pump low), `0x04` = massage (pump high)                   |
-| 14        | Heater area                | `0x40` idle, `0xF5` in KDy's sample                                            |
-| **15**    | **Heating state**          | `0x00`=off, `0x50`=circ-only, `0x54`=heating, `0x40`=cooldown, `0xC1`=UV/ozone |
-| **16**    | **Setpoint (°F)**          | `0x68` = 104°F = 40°C                                                          |
-| 17        | Flags                      |                                                                                |
-| **18**    | **Light / shared flags**   | bit 0 (`0x01`) = light ON; `0x80` = set during UV/heating states               |
-| 19–27     | Various                    | Schedule/config data                                                           |
-| **28**    | **Equipment flags**        | Mirrors byte 13 for pump (needs validation)                                    |
-| **29**    | **UV/Ozone flag**          | `0x20` when UV/ozone active                                                    |
-| 30–52     | Various                    |                                                                                |
-| **53–58** | **Date/Time**              | year, month, day, hour, minute, second (may need unescape)                     |
-| 59–end    | CRC (4 bytes) + `0x1D`     |                                                                                |
+| Byte      | Content                    | Notes (KDy P25B85)                                                                                                                                                                                          |
+|-----------|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0         | `0x1A`                     | Start                                                                                                                                                                                                       |
+| 1         | `0xFF`                     | Broadcast address                                                                                                                                                                                           |
+| 2         | `0x01`                     | Master address                                                                                                                                                                                              |
+| 3         | `0x3C`                     | Length                                                                                                                                                                                                      |
+| 4–8       | `D2 B4 FF 08 03`           | Header (byte 8 = `0x03` for P25B85, `0x02` for P23B32)                                                                                                                                                      |
+| **9**     | **Water temperature (°F)** | `0x5E` = 94°F = 34.4°C                                                                                                                                                                                      |
+| 10–11     | `0x04 0x06`                | Unknown                                                                                                                                                                                                     |
+| **12–13** | **Pump status candidates** | ⚠️ Needs local validation. KDy notes mention pump status at byte 13, but the reference sample contains `0x04` at byte 12 and `0xF5` at byte 13. Do not hard-code pump low/high until captures resolve this. |
+| 14        | Heater area                | `0x40` idle in some notes; exact relation to bytes 12/13/15 needs validation                                                                                                                                |
+| **15**    | **Heating state**          | `0x00`=off, `0x50`=circ-only, `0x54`=heating, `0x40`=cooldown, `0xC1`=UV/ozone                                                                                                                              |
+| **16**    | **Setpoint (°F)**          | `0x68` = 104°F = 40°C                                                                                                                                                                                       |
+| 17        | Flags                      |                                                                                                                                                                                                             |
+| **18**    | **Light / shared flags**   | bit 0 (`0x01`) = light ON; `0x80` = set during UV/heating states                                                                                                                                            |
+| 19–27     | Various                    | Schedule/config data                                                                                                                                                                                        |
+| **28**    | **Equipment flags**        | May mirror pump status; needs validation after pump byte/index is resolved                                                                                                                                  |
+| **29**    | **UV/Ozone flag**          | `0x20` when UV/ozone active                                                                                                                                                                                 |
+| 30–52     | Various                    |                                                                                                                                                                                                             |
+| **53–58** | **Date/Time**              | year, month, day, hour, minute, second (may need unescape)                                                                                                                                                  |
+| 59–end    | CRC (4 bytes) + `0x1D`     |                                                                                                                                                                                                             |
+
+⚠️ **Index conflict to resolve before Phase 3:** The reference sample appears to
+place the pump-like value `0x04` at byte 12, while the community summary says
+byte 13. The capture parser must display full byte diffs for pump-low and
+pump-high captures, and the P25B85 adapter must not expose `pump_low` /
+`pump_high` from a fixed index until this is confirmed on local hardware.
 
 ### P25B85 status combinations (KDy post #74)
 
-| State                      | byte[13] | byte[15] | byte[18] | byte[29] |
-|----------------------------|----------|----------|----------|----------|
-| All off                    | `0x00`*  | `0x00`   | `0x00`   | `0x00`   |
-| Light only                 | —        | —        | `0x01`   | —        |
-| Filtration (pump low)      | `0x02`   | —        | —        | —        |
-| Massage (pump high)        | `0x04`   | —        | —        | —        |
-| UV/ozone only              | —        | `0xC1`   | `0x80`   | `0x20`   |
-| UV/ozone + light           | —        | `0xC1`   | `0x81`   | `0x20`   |
-| Heating stage 1 (circ)     | —        | `0x50`   | `0x80`   | `0x20`   |
-| Heating stage 2 (active)   | —        | `0x54`   | `0x80`   | `0x20`   |
-| Heating stage 3 (cooldown) | —        | `0x40`   | `0x80`   | `0x20`   |
+| State                      | pump byte TBD | byte[15] | byte[18] | byte[29] |
+|----------------------------|---------------|----------|----------|----------|
+| All off                    | `0x00`*       | `0x00`   | `0x00`   | `0x00`   |
+| Light only                 | —             | —        | `0x01`   | —        |
+| Filtration (pump low)      | `0x02`        | —        | —        | —        |
+| Massage (pump high)        | `0x04`        | —        | —        | —        |
+| UV/ozone only              | —             | `0xC1`   | `0x80`   | `0x20`   |
+| UV/ozone + light           | —             | `0xC1`   | `0x81`   | `0x20`   |
+| Heating stage 1 (circ)     | —             | `0x50`   | `0x80`   | `0x20`   |
+| Heating stage 2 (active)   | —             | `0x54`   | `0x80`   | `0x20`   |
+| Heating stage 3 (cooldown) | —             | `0x40`   | `0x80`   | `0x20`   |
 
-*KDy did not state byte[13] for "all off" explicitly; assumed `0x00` from context.
+*KDy did not state the all-off pump byte explicitly; `0x00` is assumed from context.
 
 ### P23B32 differences (christopheknap posts #89, #92, #94)
 
-| Field           | P25B85           | P23B32                                              |
-|-----------------|------------------|-----------------------------------------------------|
-| Header byte 8   | `0x03`           | `0x02`                                              |
-| Pump low/filter | byte 13 & `0x02` | byte 17 bit `0x80`                                  |
-| Left jets       | —                | byte 12 & `0x04`                                    |
-| Right jets      | —                | byte 12 & `0x10`                                    |
-| Blower          | —                | byte 14 & `0x08`                                    |
-| Heater active   | byte 15 = `0x54` | byte 14 & `0x10` (confirmed with smart plug)        |
-| Light           | byte 18 & `0x01` | byte 17 & `0x01`                                    |
-| Filtration      | byte 13 & `0x02` | byte 14 & `0x01` (wrong! actually byte 17 & `0x80`) |
-| Unescape scope  | full frame       | tail only (bytes 55+)                               |
+| Field           | P25B85                 | P23B32                                              |
+|-----------------|------------------------|-----------------------------------------------------|
+| Header byte 8   | `0x03`                 | `0x02`                                              |
+| Pump low/filter | pump byte TBD & `0x02` | byte 17 bit `0x80`                                  |
+| Left jets       | —                      | byte 12 & `0x04`                                    |
+| Right jets      | —                      | byte 12 & `0x10`                                    |
+| Blower          | —                      | byte 14 & `0x08`                                    |
+| Heater active   | byte 15 = `0x54`       | byte 14 & `0x10` (confirmed with smart plug)        |
+| Light           | byte 18 & `0x01`       | byte 17 & `0x01`                                    |
+| Filtration      | pump byte TBD & `0x02` | byte 14 & `0x01` (wrong! actually byte 17 & `0x80`) |
+| Unescape scope  | full frame             | tail only (bytes 55+)                               |
+
+⚠️ **P23B32 compatibility note:** The current fork parses P23B32 filtration as
+`byte[14] & 0x01`. Community notes suggest `byte[17] & 0x80` may be the correct
+filtration indicator. Preserve current fork behavior initially, or expose both
+legacy/candidate values as diagnostics, until validated on P23B32 captures.
 
 ### CRC safety (CRITICAL — KDy post #97)
 
@@ -165,9 +199,18 @@ Reference frame from KDy (post #74), 0-indexed from `0x1A`:
 
 ### Single integration, multi-model adapters
 
-The integration lives in `custom_components/joyonway_p25b85/` (primary model).
+The unified integration should live in a neutral domain such as
+`custom_components/joyonway_spa/` rather than a model-specific domain. This keeps
+P25B85, P23B32, P20B29, and future PB55x-family controllers under one Home
+Assistant integration.
+
+If the existing `joyonway_p23b32` fork is migrated, document this as a breaking
+domain change and provide migration guidance. Existing Home Assistant config
+entries under the old domain will not automatically become entries for the new
+domain without explicit migration/user action.
+
 A model adapter interface separates shared protocol machinery from per-model
-byte semantics.
+byte semantics, supported entities, and write capability.
 
 ### Shared core (reuse from P23B32 fork)
 
@@ -179,38 +222,74 @@ byte semantics.
 
 ### Model adapter interface
 
-```python
-class ModelAdapter:
+```text
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Protocol
+
+
+@dataclass(frozen=True)
+class EntityDescription:
+    platform: str                       # "sensor", "binary_sensor", "button", ...
+    key: str                            # e.g. "water_temperature"
+    name: str                           # user-facing name
+    icon: str | None = None
+    enabled_by_default: bool = True
+
+
+class ModelAdapter(Protocol):
     """Per-model byte mapping and feature support."""
     model: str                          # e.g. "P25B85"
     broadcast_signature: bytes          # header to match
     unescape_full_frame: bool           # True for P25B85, False for P23B32
+    supports_writes: bool               # False for P25B85 until replay captures exist
 
     def parse_status(self, frame: bytes) -> dict:
         """Extract state dict from unescaped broadcast frame."""
 
-    def supported_entities(self) -> list[str]:
-        """List of entity keys this model exposes."""
+    def entity_descriptions(self) -> list[EntityDescription]:
+        """List platform/key/name/device metadata for entities this model exposes."""
 ```
+
+Entity metadata should be adapter-driven rather than hard-coded in `sensor.py`
+and `binary_sensor.py`. A small frozen dataclass can describe the platform,
+entity key, display name, icon, unit, device class, state class, entity category,
+and whether a diagnostic entity is enabled by default.
 
 ### P25B85 adapter (primary, read-only first)
 
 Entities to expose:
 - `sensor.water_temperature` — byte 9, °F → °C
 - `sensor.setpoint` — byte 16, °F → °C
-- `binary_sensor.pump_low` — byte 13 & `0x02` (filtration/circulation)
-- `binary_sensor.pump_high` — byte 13 & `0x04` (massage/jets)
+- `binary_sensor.pump_low` — pump byte/index TBD from captures; expected mask `0x02` (filtration/circulation)
+- `binary_sensor.pump_high` — pump byte/index TBD from captures; expected mask `0x04` (massage/jets)
 - `binary_sensor.light` — byte 18 & `0x01`
-- `binary_sensor.heater` — byte 15 in (`0x50`, `0x54`, `0x40`)
 - `binary_sensor.heater_active` — byte 15 == `0x54` (element actually drawing power)
+- `sensor.heater_state` — byte 15 decoded as off / circulation / heating / cooldown / UV / unknown
 - `binary_sensor.uv_lamp` — byte 15 == `0xC1` or byte 29 & `0x20`
 - `binary_sensor.bridge_connection` — TCP connectivity
 - `sensor.spa_datetime` — bytes 53–58 (optional, low priority)
+- optional disabled-by-default diagnostic sensors for raw bytes used by the
+  adapter, especially pump candidates and heater/UV bytes
+
+Do not expose a generic `binary_sensor.heater` unless its semantics are clearly
+defined. `byte[15] == 0x54` means the heating element is active; `0x50` and
+`0x40` appear to be circulation/cooldown stages and should not be presented as
+the heater actively drawing power.
+
+For P25B85 Phase 3, the integration is **read-only**:
+- no `button` platform
+- no setpoint write controls
+- no reuse of P23B32 command builders
+- no synthetic frame construction
 
 ### P23B32 adapter (preserve existing behavior)
 
-Keep the existing P23B32 byte map as a second adapter. This ensures anyone
-using the P23B32 fork can migrate without breakage.
+Keep the existing P23B32 byte map as a second adapter initially. This ensures
+anyone using the P23B32 fork can migrate without immediate behavior changes.
+Where community notes conflict with the existing fork, add diagnostics and test
+captures before changing exposed entity semantics.
 
 ### Bridge naming
 
@@ -231,8 +310,8 @@ For each scenario, enforce: `baseline_before` → `action_active` → `baseline_
 |---|-------------------------------------------------|------------------------------------|
 | 0 | Initial baseline (everything off)               | Reference frame                    |
 | 1 | Light ON (press button, any color)              | byte 18 → `0x01`                   |
-| 2 | Pump LOW (press pump button once)               | byte 13 → `0x02`                   |
-| 3 | Pump HIGH (press pump button again)             | byte 13 → `0x04`                   |
+| 2 | Pump LOW (press pump button once)               | pump byte TBD → `0x02`             |
+| 3 | Pump HIGH (press pump button again)             | pump byte TBD → `0x04`             |
 | 4 | Heater active (raise setpoint above water temp) | byte 15 → `0x50` then `0x54`       |
 | 5 | UV lamp (if accessible from panel)              | byte 15 → `0xC1`, byte 29 → `0x20` |
 | 6 | Setpoint change (try 2–3 different °F values)   | byte 16 changes                    |
@@ -241,7 +320,7 @@ For each scenario, enforce: `baseline_before` → `action_active` → `baseline_
 
 - [ ] Confirm byte 8 = `0x03` in your broadcast header
 - [ ] Confirm byte 9 = water temp °F (convert and check against panel display)
-- [ ] Confirm byte 13 behavior for pump low vs pump high
+- [ ] Resolve pump status byte/index (byte 12 vs byte 13 conflict) for low vs high
 - [ ] Confirm byte 15 heating stages (0x50 → 0x54 → 0x40)
 - [ ] Confirm byte 16 = setpoint °F
 - [ ] Confirm byte 18 bit 0 = light
@@ -260,36 +339,55 @@ For each scenario, enforce: `baseline_before` → `action_active` → `baseline_
   - Saves raw `.bin` files + `session_manifest.json`
   - Read/capture only, no write capability
   - Python stdlib only (no pip dependencies)
+  - Graceful Ctrl-C handling and per-segment metadata: timestamps, duration,
+    byte count, frame count, broadcast count, notes
+  - Warns about the bridge single-client limitation before starting
 - [ ] Implement `tools/frame_parser_38400.py`
   - Parses `.bin` captures into individual frames
-  - Applies pseudo-unescape
+  - Detects frame boundaries on raw bytes, then applies selectable unescape
+    policy: `full`, `tail`, `none`, or `auto`
   - Displays broadcast frames with annotated byte map
-  - Diff mode: compare two captures side-by-side
+  - Diff mode: compare two captures side-by-side and summarize byte-value
+    histograms across all broadcast frames, not only the first frame
+  - Supports `--model p25b85|p23b32|auto`, `--json`, and optionally `--csv`
+  - Displays both raw/wire indexes and logical indexes when escapes are present
+- [ ] Add pure-stdlib tests/golden samples for frame extraction, pseudo-unescape,
+      malformed escapes, KDy sample parsing, and diff output
 - [ ] Add `tools/README.md` with quick-start examples
 - [ ] Dry-run validation
 
-### Phase 2: Code refactoring (adapter architecture)
+### Phase 2: Protocol/adapters with tests
 
-- [ ] Rename integration folder to `joyonway_p25b85` with updated domain
+- [ ] Choose final neutral integration domain, preferably `joyonway_spa`
+- [ ] Rename/create integration folder with updated domain and migration notes
 - [ ] Extract shared frame parser from `rs485.py` into `protocol.py`
-  - `find_frames(stream: bytes) -> list[bytes]`
+  - `find_frames(stream: bytes) -> list[bytes]` operating on raw bytes
   - `pseudo_unescape(data: bytes) -> bytes`
-  - `validate_frame(frame: bytes) -> bool`
+  - `validate_frame(frame: bytes) -> bool` with conservative validation only
 - [ ] Create `adapters/` package with `base.py`, `p25b85.py`, `p23b32.py`
+- [ ] Keep command/replay data separate from status parsing, e.g.
+      `p23b32_commands.py`; do not place write frames in shared protocol code
+- [ ] Add golden-frame tests for `protocol.py` and each adapter before wiring HA entities
 - [ ] Update `coordinator.py` to use adapter interface
 - [ ] Update `config_flow.py` to add model selection (default P25B85)
-- [ ] Update entity files to use adapter's `supported_entities()`
+  - Store `model` in config entry data from the beginning
+  - Later enhancement: auto-detect model from broadcast header byte 8
+- [ ] Update entity files to use adapter's `entity_descriptions()`
 - [ ] Update `manifest.json`, `const.py`, `strings.json`, translations
 - [ ] Make device info dynamic (model name from adapter)
+- [ ] Update `hacs.json`, README files, and bridge wording from W610/EW11-specific
+      text to generic "RS485 bridge"
 
 ### Phase 3: Read-only P25B85 integration
 
 - [ ] Implement P25B85 adapter `parse_status()` using KDy's byte map
-- [ ] Validate byte mappings against your captures (update if they differ)
+- [ ] Validate byte mappings against your captures before exposing entities
+  - Especially resolve the byte 12 vs byte 13 pump-status conflict
 - [ ] Wire sensor entities: water_temperature, setpoint
-- [ ] Wire binary_sensor entities: pump_low, pump_high, light, heater, uv_lamp, bridge_connection
+- [ ] Wire binary_sensor entities: pump_low, pump_high, light, heater_active, uv_lamp, bridge_connection
 - [ ] Test with live spa data
-- [ ] Add heater state detail sensor (off / circulation / heating / cooldown / UV)
+- [ ] Add heater state detail sensor (off / circulation / heating / cooldown / UV / unknown)
+- [ ] Confirm P25B85 does not load the button platform and has no write path
 
 ### Phase 4: Write commands (only after captures + validation)
 
@@ -300,6 +398,8 @@ For each scenario, enforce: `baseline_before` → `action_active` → `baseline_
 - [ ] Add 30s post-command read suspension (per Gaet78/christopheknap finding)
 - [ ] Add write allowlist: only replay captured, CRC-verified frames
 - [ ] Add safe-fail: reject writes when no captured frame exists for requested action
+- [ ] Require explicit per-model write enablement; P25B85 remains read-only unless
+      a validated replay table is provided for matching hardware
 
 ### Phase 5: Polish & release
 
@@ -316,6 +416,7 @@ For each scenario, enforce: `baseline_before` → `action_active` → `baseline_
 - ❌ Don't send commands with forged CRC (P25B85: unsafe, can activate heater)
 - ❌ Don't construct synthetic write frames
 - ❌ Don't send a write if no captured, CRC-verified replay frame exists
+- ❌ Don't load write/button entities for P25B85 during read-only phases
 - ❌ Don't bump version until Phase 3 is validated on live hardware
 - ⚠️ Always capture command frames from the physical panel, never guess
 - ⚠️ 30s read suspension after any write command
@@ -363,8 +464,9 @@ print(f'OK: {len(d)} bytes, first 10: {d[:10].hex(\" \")}')"
 
 1. **Implement `tools/guided_capture_38400.py`** — so you can capture at the spa
 2. **Implement `tools/frame_parser_38400.py`** — so you can analyze captures
-3. **Go to the spa and capture** — follow the sequence in section 4
-4. **Analyze captures** — validate KDy's byte map against your hardware
-5. **Implement Phase 2** — refactor codebase into adapter architecture
-6. **Implement Phase 3** — read-only P25B85 entities
-7. **Test on live spa** — validate everything works
+3. **Add parser/protocol tests with golden samples** — catch indexing and escape mistakes early
+4. **Go to the spa and capture** — follow the sequence in section 4
+5. **Analyze captures** — validate KDy's byte map and resolve pump byte conflict
+6. **Implement Phase 2** — neutral-domain adapter architecture with tests
+7. **Implement Phase 3** — read-only P25B85 entities, no buttons/writes
+8. **Test on live spa** — validate everything works before considering replay writes
