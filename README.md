@@ -63,7 +63,7 @@ The dashboard uses Mushroom cards, custom button-card, and a circular thermostat
 | Item | Details |
 |------|---------|
 | Spa controller | Joyonway P23B32 (physically validated, other models may need protocol adaptation) |
-| RS485 bridge | USR-W610 (WiFi, TCP Server mode, port 8899, 9600 8N1) |
+| RS485 bridge | USR-W610 (WiFi, TCP Server mode, port 8899, 34800 8N1) |
 | Home Assistant | 2024.1.0 or later |
 | Network | HA and W610 on the same LAN, no internet required |
 
