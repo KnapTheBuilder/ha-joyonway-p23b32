@@ -1,12 +1,19 @@
-# Joyonway Spa Integration Plan — Unified RS485 / PB55x Controllers
+# Joyonway Spa Integration Plan — P25B85 RS485 Controller
 
-> **Goal:** A single Home Assistant integration supporting multiple Joyonway
-> RS485/PB55x controller models via model adapters, starting with validated,
-> read-only P25B85 support.
+> **Goal:** A Home Assistant integration for the Joyonway P25B85 controller,
+> with a model adapter interface ready for future multi-model expansion.
 >
-> **Fork base:** `KnapTheBuilder/ha-joyonway-p23b32`
+> **Repo:** Fork of `ha-joyonway-p23b32` — keep upstream rebasing, add P25B85
+> **Upstream decision (2026-05-18):** christopheknap prefers to keep
+> `ha-joyonway-p23b32` P23B32-only. Cross-linking from READMEs, shared protocol
+> docs in his `joyonway-frame-analyzer` repo. Multi-model umbrella revisit in ~6
+> months.
+>
 > **Primary test hardware:** P25B85 + PB554 + Elfin EW11
-> **Preferred integration domain:** `joyonway_spa` (neutral multi-model domain)
+> **Integration domain:** `joyonway_p25b85` (own domain, keep upstream `joyonway_p23b32` intact)
+> **Strategy:** Keep `custom_components/joyonway_p23b32/` rebasing from upstream.
+> Add `custom_components/joyonway_p25b85/` for our controller. Abstract into
+> unified `joyonway_spa` later when upstream is ready.
 
 ---
 
@@ -197,28 +204,23 @@ legacy/candidate values as diagnostics, until validated on P23B32 captures.
 
 ## 3. Integration Architecture
 
-### Single integration, multi-model adapters
+### Independent integration, adapter-ready
 
-The unified integration should live in a neutral domain such as
-`custom_components/joyonway_spa/` rather than a model-specific domain. This keeps
-P25B85, P23B32, P20B29, and future PB55x-family controllers under one Home
-Assistant integration.
+The integration lives in `custom_components/joyonway_p25b85/`. The upstream
+`custom_components/joyonway_p23b32/` is kept intact for rebasing. Both can
+coexist in HA (separate domains, separate config entries).
 
-If the existing `joyonway_p23b32` fork is migrated, document this as a breaking
-domain change and provide migration guidance. Existing Home Assistant config
-entries under the old domain will not automatically become entries for the new
-domain without explicit migration/user action.
+When christopheknap is ready to collaborate on a unified integration, both
+adapters merge into `joyonway_spa`. Until then, shared protocol code lives in
+`joyonway_p25b85/protocol.py` (can be extracted later).
 
-A model adapter interface separates shared protocol machinery from per-model
-byte semantics, supported entities, and write capability.
+### Shared core
 
-### Shared core (reuse from P23B32 fork)
-
-- TCP client and reconnect strategy
+- TCP client and reconnect strategy (async, persistent connection)
 - Frame boundary reconstruction (`0x1A ... 0x1D`) from TCP stream chunks
 - Pseudo-unescape utility
 - Coordinator update flow, entity dispatch, error handling
-- Config flow (IP, port, model selection)
+- Config flow (IP, port, model selection — defaulting to P25B85)
 
 ### Model adapter interface
 
@@ -242,8 +244,8 @@ class ModelAdapter(Protocol):
     """Per-model byte mapping and feature support."""
     model: str                          # e.g. "P25B85"
     broadcast_signature: bytes          # header to match
-    unescape_full_frame: bool           # True for P25B85, False for P23B32
-    supports_writes: bool               # False for P25B85 until replay captures exist
+    unescape_full_frame: bool           # True for P25B85
+    supports_writes: bool               # False until replay captures exist
 
     def parse_status(self, frame: bytes) -> dict:
         """Extract state dict from unescaped broadcast frame."""
@@ -252,48 +254,33 @@ class ModelAdapter(Protocol):
         """List platform/key/name/device metadata for entities this model exposes."""
 ```
 
-Entity metadata should be adapter-driven rather than hard-coded in `sensor.py`
-and `binary_sensor.py`. A small frozen dataclass can describe the platform,
-entity key, display name, icon, unit, device class, state class, entity category,
-and whether a diagnostic entity is enabled by default.
-
-### P25B85 adapter (primary, read-only first)
+### P25B85 adapter (primary, read-only)
 
 Entities to expose:
 - `sensor.water_temperature` — byte 9, °F → °C
 - `sensor.setpoint` — byte 16, °F → °C
-- `binary_sensor.pump_low` — pump byte/index TBD from captures; expected mask `0x02` (filtration/circulation)
-- `binary_sensor.pump_high` — pump byte/index TBD from captures; expected mask `0x04` (massage/jets)
+- `binary_sensor.pump_low` — pump byte/index TBD from captures; expected mask `0x02`
+- `binary_sensor.pump_high` — pump byte/index TBD from captures; expected mask `0x04`
 - `binary_sensor.light` — byte 18 & `0x01`
-- `binary_sensor.heater_active` — byte 15 == `0x54` (element actually drawing power)
+- `binary_sensor.heater_active` — byte 15 == `0x54`
 - `sensor.heater_state` — byte 15 decoded as off / circulation / heating / cooldown / UV / unknown
 - `binary_sensor.uv_lamp` — byte 15 == `0xC1` or byte 29 & `0x20`
 - `binary_sensor.bridge_connection` — TCP connectivity
 - `sensor.spa_datetime` — bytes 53–58 (optional, low priority)
-- optional disabled-by-default diagnostic sensors for raw bytes used by the
-  adapter, especially pump candidates and heater/UV bytes
+- optional disabled-by-default diagnostic sensors for raw bytes
 
-Do not expose a generic `binary_sensor.heater` unless its semantics are clearly
-defined. `byte[15] == 0x54` means the heating element is active; `0x50` and
-`0x40` appear to be circulation/cooldown stages and should not be presented as
-the heater actively drawing power.
-
-For P25B85 Phase 3, the integration is **read-only**:
-- no `button` platform
-- no setpoint write controls
-- no reuse of P23B32 command builders
-- no synthetic frame construction
-
-### P23B32 adapter (preserve existing behavior)
-
-Keep the existing P23B32 byte map as a second adapter initially. This ensures
-anyone using the P23B32 fork can migrate without immediate behavior changes.
-Where community notes conflict with the existing fork, add diagnostics and test
-captures before changing exposed entity semantics.
+The integration is **read-only** (no button platform, no writes, no synthetic frames).
 
 ### Bridge naming
 
-All user-facing text says "RS485 bridge" instead of "W610" or "EW11" (bridge-agnostic).
+All user-facing text says "RS485 bridge" (bridge-agnostic).
+
+### Complementary tools
+
+- **Our `tools/`**: guided capture, CLI parser, automated tests
+- **Christophe's [joyonway-frame-analyzer](https://github.com/KnapTheBuilder/joyonway-frame-analyzer)**:
+  browser-based visual frame explorer (xxd input, click-to-diff).
+  Use for visual exploration; contribute a P25B85 preset PR once byte map is confirmed.
 
 ---
 
@@ -331,82 +318,59 @@ For each scenario, enforce: `baseline_before` → `action_active` → `baseline_
 
 ## 5. Implementation Plan
 
-### Phase 1: Capture tool
+### Phase 1: Capture tool ✅ DONE
 
-- [ ] Implement `tools/guided_capture_38400.py`
-  - CLI with `--host`, `--port`, `--duration`, `--actions`, `--out-dir`, `--dry-run`
-  - Guided prompts: baseline → action → baseline for each scenario
-  - Saves raw `.bin` files + `session_manifest.json`
-  - Read/capture only, no write capability
-  - Python stdlib only (no pip dependencies)
-  - Graceful Ctrl-C handling and per-segment metadata: timestamps, duration,
-    byte count, frame count, broadcast count, notes
-  - Warns about the bridge single-client limitation before starting
-- [ ] Implement `tools/frame_parser_38400.py`
-  - Parses `.bin` captures into individual frames
-  - Detects frame boundaries on raw bytes, then applies selectable unescape
-    policy: `full`, `tail`, `none`, or `auto`
-  - Displays broadcast frames with annotated byte map
-  - Diff mode: compare two captures side-by-side and summarize byte-value
-    histograms across all broadcast frames, not only the first frame
-  - Supports `--model p25b85|p23b32|auto`, `--json`, and optionally `--csv`
-  - Displays both raw/wire indexes and logical indexes when escapes are present
-- [ ] Add pure-stdlib tests/golden samples for frame extraction, pseudo-unescape,
-      malformed escapes, KDy sample parsing, and diff output
-- [ ] Add `tools/README.md` with quick-start examples
-- [ ] Dry-run validation
+- [x] Implement `tools/guided_capture_38400.py`
+- [x] Implement `tools/frame_parser_38400.py`
+- [x] Add pure-stdlib tests/golden samples
+- [x] Add `tools/README.md` with quick-start examples
 
 ### Phase 2: Protocol/adapters with tests
 
-- [ ] Choose final neutral integration domain, preferably `joyonway_spa`
-- [ ] Rename/create integration folder with updated domain and migration notes
-- [ ] Extract shared frame parser from `rs485.py` into `protocol.py`
-  - `find_frames(stream: bytes) -> list[bytes]` operating on raw bytes
-  - `pseudo_unescape(data: bytes) -> bytes`
-  - `validate_frame(frame: bytes) -> bool` with conservative validation only
-- [ ] Create `adapters/` package with `base.py`, `p25b85.py`, `p23b32.py`
-- [ ] Keep command/replay data separate from status parsing, e.g.
-      `p23b32_commands.py`; do not place write frames in shared protocol code
-- [ ] Add golden-frame tests for `protocol.py` and each adapter before wiring HA entities
-- [ ] Update `coordinator.py` to use adapter interface
-- [ ] Update `config_flow.py` to add model selection (default P25B85)
-  - Store `model` in config entry data from the beginning
-  - Later enhancement: auto-detect model from broadcast header byte 8
-- [ ] Update entity files to use adapter's `entity_descriptions()`
-- [ ] Update `manifest.json`, `const.py`, `strings.json`, translations
-- [ ] Make device info dynamic (model name from adapter)
-- [ ] Update `hacs.json`, README files, and bridge wording from W610/EW11-specific
-      text to generic "RS485 bridge"
+- [x] Choose final integration domain: `joyonway_p25b85` (keep upstream `p23b32` intact)
+- [ ] Create `custom_components/joyonway_p25b85/` with:
+  - `__init__.py` — entry setup, coordinator creation
+  - `const.py` — domain, config keys, defaults
+  - `manifest.json` — HACS-compatible manifest
+  - `config_flow.py` — IP, port, model selection (default P25B85)
+  - `strings.json` + `translations/en.json`, `translations/fr.json`
+  - `protocol.py` — shared frame parser (`find_frames`, `pseudo_unescape`, `validate_frame`)
+  - `coordinator.py` — async polling coordinator with persistent TCP
+  - `adapters/__init__.py` — adapter registry
+  - `adapters/base.py` — ModelAdapter protocol + EntityDescription dataclass
+  - `adapters/p25b85.py` — P25B85 byte map and entity list
+  - `sensor.py` — adapter-driven sensor entities
+  - `binary_sensor.py` — adapter-driven binary sensor entities
+- [ ] Add golden-frame tests for `protocol.py` and the P25B85 adapter
+- [ ] Update `hacs.json` and README for new domain
 
-### Phase 3: Read-only P25B85 integration
+### Phase 3: Validate at the spa + wire entities
 
-- [ ] Implement P25B85 adapter `parse_status()` using KDy's byte map
-- [ ] Validate byte mappings against your captures before exposing entities
-  - Especially resolve the byte 12 vs byte 13 pump-status conflict
-- [ ] Wire sensor entities: water_temperature, setpoint
-- [ ] Wire binary_sensor entities: pump_low, pump_high, light, heater_active, uv_lamp, bridge_connection
-- [ ] Test with live spa data
-- [ ] Add heater state detail sensor (off / circulation / heating / cooldown / UV / unknown)
-- [ ] Confirm P25B85 does not load the button platform and has no write path
+- [ ] **Go to the spa** and run `python3 tools/guided_capture_38400.py`
+- [ ] Analyze captures with `tools/frame_parser_38400.py` + visual check in
+      christopheknap's web analyzer
+- [ ] Validate byte map against KDy's documentation
+- [ ] Resolve the byte 12 vs byte 13 pump-status conflict
+- [ ] Update P25B85 adapter with confirmed byte positions
+- [ ] Test integration with live spa data
+- [ ] Contribute P25B85 preset PR to `joyonway-frame-analyzer`
 
 ### Phase 4: Write commands (only after captures + validation)
 
-- [ ] Capture command frames from panel for each action (needs spa visit)
+- [ ] Capture command frames from panel for each action
 - [ ] Build command replay table: one verified frame per action with known-good CRC
 - [ ] Implement flood-inject: 10× at 0.5s intervals
-- [ ] Add button entities (light toggle, pump cycle, etc.)
-- [ ] Add 30s post-command read suspension (per Gaet78/christopheknap finding)
+- [ ] Add button entities (light toggle, pump cycle)
+- [ ] Add 30s post-command read suspension
 - [ ] Add write allowlist: only replay captured, CRC-verified frames
-- [ ] Add safe-fail: reject writes when no captured frame exists for requested action
-- [ ] Require explicit per-model write enablement; P25B85 remains read-only unless
-      a validated replay table is provided for matching hardware
 
 ### Phase 5: Polish & release
 
-- [ ] Documentation (README with safety section, protocol.md)
+- [ ] Documentation (README with safety section)
 - [ ] HACS compatibility validation
 - [ ] Auto-detect model from broadcast header byte 8
 - [ ] Community testing invitation
+- [ ] Cross-link with christopheknap's P23B32 repo
 
 ---
 
@@ -452,7 +416,7 @@ print(f'OK: {len(d)} bytes, first 10: {d[:10].hex(\" \")}')"
 | Person             | Controller     | Contribution                                                                                                                           |
 |--------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | **KDy**            | P25B85 + PB554 | Baud rate discovery (logic analyzer), broadcast byte map, pseudo-escape table, CRC safety warning, full MQTT read+write control        |
-| **christopheknap** | P23B32 + PB555 | Full HACS integration ([GitHub](https://github.com/KnapTheBuilder/ha-joyonway-p23b32)), command frame captures, cross-model validation |
+| **christopheknap** | P23B32 + PB555 | Full HACS integration, command frame captures, frame-analyzer web tool, cross-model validation                                         |
 | **Gaet78**         | P69B133        | Original HACS integration (115200 baud, different protocol), 30s timing discovery                                                      |
 | **c0mpleX**        | P25B37         | Frame samples (9600, wrong baud), hex extraction from screenshots                                                                      |
 | **Yannickt26**     | P20B29 + WiFi  | Partial ON commands working, confirmed blower OFF frame from P23B32 works                                                              |
@@ -462,11 +426,10 @@ print(f'OK: {len(d)} bytes, first 10: {d[:10].hex(\" \")}')"
 
 ## 9. Next Steps (in order)
 
-1. **Implement `tools/guided_capture_38400.py`** — so you can capture at the spa
-2. **Implement `tools/frame_parser_38400.py`** — so you can analyze captures
-3. **Add parser/protocol tests with golden samples** — catch indexing and escape mistakes early
-4. **Go to the spa and capture** — follow the sequence in section 4
-5. **Analyze captures** — validate KDy's byte map and resolve pump byte conflict
-6. **Implement Phase 2** — neutral-domain adapter architecture with tests
-7. **Implement Phase 3** — read-only P25B85 entities, no buttons/writes
-8. **Test on live spa** — validate everything works before considering replay writes
+1. **Implement Phase 2** — create `custom_components/joyonway_spa/` with adapter arch
+2. **Go to the spa** — run guided capture tool, follow sequence in section 4
+3. **Analyze captures** — validate byte map, resolve pump byte conflict
+4. **Update adapter** — wire confirmed byte positions into P25B85 adapter
+5. **Test on live spa** — validate integration works end-to-end
+6. **Contribute P25B85 preset** — PR to christopheknap's frame-analyzer
+7. **Phase 4** — write commands (only after full read validation)
