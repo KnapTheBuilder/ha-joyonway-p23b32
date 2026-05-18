@@ -22,7 +22,7 @@
 - **Spa:** Home Deluxe White Marble (outdoor whirlpool, rigid/hardshell)
 - **Controller:** Joyonway P25B85, PCB `P2325B0003 R05`
 - **Touchpad:** PB554 color screen
-- **Bridge:** Elfin EW11, RS-485 → WiFi, TCP server `192.168.188.58:8899`
+- **Bridge:** Elfin EW11, RS-485 → WiFi, TCP server (see `.env` for address)
 - **UART:** 38400 8N1 (confirmed by KDy via logic analyzer, 26µs bit time)
 - **Pump:** ONE dual-speed pump (short-press cycles: low → high → off)
   - Low speed = filtration / circulation
@@ -402,7 +402,7 @@ For each scenario, enforce: `baseline_before` → `action_active` → `baseline_
 ```bash
 python3 -c "
 import socket
-s = socket.create_connection(('192.168.188.58', 8899), timeout=10)
+s = socket.create_connection(('YOUR_BRIDGE_IP', 8899), timeout=10)
 s.settimeout(5)
 d = s.recv(4096)
 s.close()

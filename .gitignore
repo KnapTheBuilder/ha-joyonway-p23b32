@@ -6,3 +6,7 @@ __pycache__/
 *.bak.*
 *.bak2
 *.bak_kdy
+.env
+captures/
+.idea/
+*.pdf
