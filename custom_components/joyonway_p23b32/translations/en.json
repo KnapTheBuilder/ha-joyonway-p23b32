@@ -2,19 +2,26 @@
   "config": {
     "step": {
       "user": {
-        "title": "Joyonway P23B32",
-        "description": "Enter the IP address and TCP port of your USR-W610 RS485 bridge.",
+        "title": "Joyonway Spa Setup",
+        "description": "Connect to your Joyonway spa via USR-W610 RS485-to-WiFi bridge.\n\nPrerequisites:\n- W610 in Transparent TCP mode (NOT Modbus)\n- W610 baudrate set to 38400 8N1\n- No other client (Joyonway app) connected to the W610\n- For heater control: activate 'Thermostat manuel' in PB555 panel menu",
         "data": {
-          "host": "IP address",
-          "port": "TCP port"
+          "w610_host": "W610 IP address",
+          "w610_port": "TCP port",
+          "controller_model": "Spa controller model"
         }
       }
     },
-    "error": {
-      "cannot_connect": "Cannot connect to the USR-W610 bridge. Check IP, port and that the bridge is powered on."
-    },
     "abort": {
-      "already_configured": "This bridge is already configured."
+      "already_configured": "This W610 IP is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "water_temperature": { "name": "Water temperature" },
+      "setpoint": { "name": "Thermostat setpoint" },
+      "heating_state": { "name": "Heating state" },
+      "water_temperature_fahrenheit": { "name": "Water temperature (F)" },
+      "setpoint_fahrenheit": { "name": "Setpoint (F)" }
     }
   }
 }

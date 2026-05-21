@@ -1,30 +1,57 @@
-"""Constants for the Joyonway P23B32 integration."""
-from __future__ import annotations
-DOMAIN: str = "joyonway_p23b32"
-# Configuration keys
-CONF_HOST: str = "host"
-CONF_PORT: str = "port"
-# Default values (USR-W610 standard)
-DEFAULT_HOST: str = "192.168.1.34"
-DEFAULT_PORT: int = 8899
-DEFAULT_NAME: str = "Joyonway P23B32"
-# RS485 behaviour
-REPEAT_COUNT: int = 10
-REPEAT_INTERVAL: float = 0.5
-TCP_TIMEOUT: float = 5.0
-# Coordinator polling - broadcast read every X seconds
-SCAN_INTERVAL: int = 40
-# Confirmed command identifiers
-CMD_LUMIERE_ON: str = "lumiere_on"
-CMD_LUMIERE_OFF: str = "lumiere_off"
-CMD_POMPE_GAUCHE_ON: str = "pompe_gauche_on"
-CMD_POMPE_GAUCHE_OFF: str = "pompe_gauche_off"
-CMD_POMPE_DROITE_ON: str = "pompe_droite_on"
-CMD_POMPE_DROITE_OFF: str = "pompe_droite_off"
-CMD_BULLEUR_ON: str = "bulleur_on"
-CMD_BULLEUR_OFF: str = "bulleur_off"
-CMD_FILTRATION: str = "filtration"
-CMD_ALL_OFF: str = "all_off"
-CMD_CONSIGNE: str = "consigne"
-# Loaded platforms
-PLATFORMS: list[str] = ["button", "sensor", "binary_sensor"]
+"""
+# 2026-05-21 | Constantes | Joyonway ha-joyonway-p23b32 v0.2 | Depend: rien
+Constantes pour l'integration Home Assistant ha-joyonway-p23b32.
+Couvre la famille de controleurs 1A/1D : P23B32 V2, P20B29, P25B85.
+"""
+
+DOMAIN = "joyonway_p23b32"
+DEFAULT_NAME = "Joyonway Spa"
+
+# Configuration
+CONF_W610_HOST = "w610_host"
+CONF_W610_PORT = "w610_port"
+CONF_CONTROLLER_MODEL = "controller_model"
+
+DEFAULT_PORT = 8899
+
+# Modeles compatibles famille 1A/1D
+SUPPORTED_MODELS = [
+    "P23B32 V2 (2019)",
+    "P20B29-2032 V183",
+    "P25B85",
+]
+
+# Polling
+SCAN_INTERVAL_SECONDS = 5
+
+# RS485 frame format
+FRAME_START = 0x1A
+FRAME_END = 0x1D
+BROADCAST_TYPE = 0xB4
+
+# Commandes panel -> mainboard (validees forum)
+# Source : KnapTheBuilder (P23B32 V2) + Yannickt26 (P20B29) cross-validation
+COMMANDS = {
+    "LIGHT_ON": "1a0130103ca100a100004040020400008081edbaa01b141d",
+    "LIGHT_OFF": "1a0130103ca100a1000040400204000080805a20cdc11d",
+    "PUMP_LEFT_ON": "1a0130103ca100a10604000002040000008b3ee4131d",
+    "PUMP_LEFT_OFF": "1a0130103ca100a106000000020400000008bd10331d",
+    "PUMP_RIGHT_ON": "1a0130103ca100a118100000020400000040d12de01d",
+    "PUMP_RIGHT_OFF": "1a0130103ca100a11800000002040000004cdfff631d",
+    "BLOWER_ON": "1a0130103ca100a10000040402040000000f7f1b11761d",
+    "BLOWER_OFF": "1a0130103ca100a1000004000204000000fcc2864f1d",
+    "FILTRATION": "1a0130103ca400a1620500160017000600fc7954c61d",
+    # Setpoint templates (Yannickt26 post #110) - byte 15 = degF
+    "SETPOINT_38C": "1a0130103ca100a1000080800204006400962061e11d",
+    "SETPOINT_10C": "1a0130103ca100a10000808002040032003422138e1d",
+}
+
+# Methode de transmission
+COMMAND_REPEAT_COUNT = 10
+COMMAND_INTERVAL_SECONDS = 0.5
+
+# Plages de validation
+SETPOINT_MIN_CELSIUS = 15.5
+SETPOINT_MAX_CELSIUS = 40.0
+TEMP_MIN_FAHRENHEIT = 60
+TEMP_MAX_FAHRENHEIT = 104
