@@ -19,12 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-This integration builds upon community work by:
-- @KDy (unescape table, B4 broadcast parser, PB555 manual research)
-- @Yannickt26 (P20B29 captures, setpoint frame validation)
-- @gaet78 (original Joyonway HACS integration for P69B133)
-- @Neuro (ESP32+MAX485 prototype on P23B32 V2)
-- @old-man (P25B85 confirmation)
-
-Source: https://community.home-assistant.io/t/joyonway-spa-control/582344

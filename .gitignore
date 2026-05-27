@@ -1,8 +1,34 @@
+# Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 .DS_Store
+
+# Backups
 *.bak
 *.bak.*
-*.bak2
-*.bak_kdy
+*.orig
+
+# HA local
+secrets.yaml
+known_devices.yaml
+.storage/
+
+# Build
+build/
+dist/
+*.egg
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/

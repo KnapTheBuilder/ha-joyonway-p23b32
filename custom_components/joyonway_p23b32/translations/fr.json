@@ -2,26 +2,19 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configuration Joyonway Spa",
-        "description": "Connectez votre spa Joyonway via le pont USR-W610 RS485-WiFi.\n\nPre-requis :\n- W610 en mode TCP Transparent (PAS Modbus)\n- W610 baudrate 38400 8N1\n- Aucun autre client (app Joyonway) connecte au W610\n- Pour le chauffage : activer 'Thermostat manuel' dans le menu du panneau PB555",
+        "title": "Joyonway P23B32",
+        "description": "Saisis l'IP et le port TCP de ton pont USR-W610 RS485.",
         "data": {
-          "w610_host": "Adresse IP du W610",
-          "w610_port": "Port TCP",
-          "controller_model": "Modele de controleur"
+          "host": "Adresse IP",
+          "port": "Port TCP"
         }
       }
     },
+    "error": {
+      "cannot_connect": "Connexion impossible au pont USR-W610."
+    },
     "abort": {
-      "already_configured": "Cette IP W610 est deja configuree."
-    }
-  },
-  "entity": {
-    "sensor": {
-      "water_temperature": { "name": "Temperature eau" },
-      "setpoint": { "name": "Consigne thermostat" },
-      "heating_state": { "name": "Etat chauffage" },
-      "water_temperature_fahrenheit": { "name": "Temperature eau (F)" },
-      "setpoint_fahrenheit": { "name": "Consigne (F)" }
+      "already_configured": "Ce pont est deja configure."
     }
   }
 }

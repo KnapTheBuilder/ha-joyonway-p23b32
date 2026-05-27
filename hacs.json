@@ -1,5 +1,7 @@
 {
-  "name": "Joyonway Spa (P23B32/P20B29/P25B85)",
-  "homeassistant": "2024.10.0",
-  "country": ["FR"]
+  "name": "Joyonway P23B32 Spa",
+  "content_in_root": false,
+  "country": "FR",
+  "homeassistant": "2024.1.0",
+  "zip_release": false
 }
