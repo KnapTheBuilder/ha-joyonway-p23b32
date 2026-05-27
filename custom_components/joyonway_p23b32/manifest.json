@@ -1,6 +1,6 @@
 {
   "domain": "joyonway_p23b32",
-  "name": "Joyonway Spa (P23B32/P20B29/P25B85)",
+  "name": "Joyonway Spa",
   "codeowners": ["@KnapTheBuilder"],
   "config_flow": true,
   "dependencies": [],
@@ -9,5 +9,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/KnapTheBuilder/ha-joyonway-p23b32/issues",
   "requirements": [],
-  "version": "0.2.0"
+  "version": "0.3.0"
 }

@@ -1,100 +1,178 @@
-# ha-joyonway-p23b32
+# Joyonway Spa - Home Assistant Integration v0.3
 
-Home Assistant custom integration for the Joyonway **P23B32** spa controller
-over RS-485, exposed to the network through a USR-W610 (or equivalent)
-TCP-to-RS485 bridge.
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> Native HA entities for temperature, setpoint, equipment states, equipment
-> control, and a full climate (thermostat) platform with dynamically
-> generated setpoint frames - no per-temperature capture required.
+Home Assistant integration for Joyonway spa controllers (1A/1D protocol family).
 
-[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/)
-![Version](https://img.shields.io/badge/version-0.3.0-blue)
-![HA](https://img.shields.io/badge/Home%20Assistant-2023.6%2B-blue)
+Integration Home Assistant pour controleurs de spa Joyonway (famille protocole 1A/1D).
 
-## Features
+---
 
-- **Sensors** : water temperature, thermostat setpoint
-- **Binary sensors** : left/right pumps, blower, filtration, heater, light, bridge connectivity
-- **Switches** : light, left pump, right pump, blower (bidirectional, mirrored from RS-485 broadcast)
-- **Buttons** : individual ON/OFF commands plus "All OFF" emergency stop
-- **Climate** : full HA thermostat with dynamic setpoint generation (15.5 C - 40 C, 0.5 C step)
-- **Config flow** : add the integration through the HA UI ; no YAML required
+## English
 
-## Hardware
+### Supported controllers
 
-| Component | Purpose |
-| --- | --- |
-| Joyonway P23B32 controller | Spa main board (RS-485 master) |
-| USR-W610 bridge | RS-485 to TCP (any equivalent works, e.g. Elfin EW11) |
-| Home Assistant Green / OS / Container | Any install supporting HACS or custom_components |
+| Model                          | Status     | Validated by              |
+|--------------------------------|------------|---------------------------|
+| Joyonway P23B32 V2 (2019)      | Validated  | @KnapTheBuilder           |
+| Joyonway P20B29-2032 V183      | Validated  | @Yannickt26               |
+| Joyonway P25B85                | Validated  | @KDy, @old-man, @alexbde  |
 
-The bridge must expose **38400 baud 8N1** on the spa's RS-485 bus and listen
-on a TCP socket (default port 8899).
+All three share the SAME RS485 protocol (0x1A/0x1D delimiters, 38400 baud, KDy pseudo-escape table, alexbde CRC-32).
 
-## Installation
+For P69B133 (Balboa-like protocol, 0x7E delimiters, 115200 baud, CRC-8), use @gaet78's integration: https://github.com/gaet78/homeassistant-joyonway-hacs-
 
-### Via HACS (custom repository)
+### What this integration does
 
-1. HACS - Integrations - Custom repositories
+**v0.3.0 features**
+
+- **Climate platform**: native HA thermostat with setpoint write, range 15.5 to 40 C, step 0.5 C. Setpoints generated dynamically by the @alexbde CRC-32 algorithm (no more static capture table).
+- **Sensor platform**: water temperature, setpoint, heating state, raw F values.
+- **Binary sensor platform**: filtration, heating, light states.
+- **Switch platform**: 4 bidirectional switches (light, left pump, right pump, blower), state mirrored from the broadcast.
+- **Button platform**: 9 validated commands (light, pumps, blower, filtration).
+- **Coordinator**: TCP polling via USR-W610 bridge with correct KDy unescape.
+- **Multi-model support**: same integration for P23B32 V2 / P20B29 / P25B85.
+
+**Coming next**
+
+- Additional command frames (ozonator, etc.)
+- Native sensor platform replacing the external temperature source
+
+### Prerequisites
+
+**Hardware**
+
+- USR-W610 RS485-to-WiFi bridge connected to the spa controller
+- W610 configured in **Transparent TCP** mode (NOT Modbus)
+- 38400 baud 8N1
+
+**Spa panel configuration**
+
+Manual heater control requires: activate **"Thermostat manuel"** in your PB555 panel menu. Without this, no software can pilot the heater.
+
+Source: PB555 manual (French), cited by @KDy on the community thread.
+
+### Installation
+
+**Via HACS (recommended)**
+
+1. HACS > Integrations > 3-dot menu > Custom repositories
 2. Add `https://github.com/KnapTheBuilder/ha-joyonway-p23b32` as **Integration**
-3. Install **Joyonway P23B32 Spa**
+3. Install "Joyonway Spa"
 4. Restart Home Assistant
-5. **Settings - Devices & services - Add integration** - search for *Joyonway*
+5. Settings > Devices & Services > Add Integration > "Joyonway"
+6. Enter your W610 IP (default port 8899)
 
-### Manual
+**Manual installation**
 
-```bash
-cd /config
-git clone https://github.com/KnapTheBuilder/ha-joyonway-p23b32 \
-  --branch main /tmp/joyonway
-cp -r /tmp/joyonway/custom_components/joyonway_p23b32 custom_components/
-```
+1. Copy `custom_components/joyonway_p23b32/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. Add integration via UI
 
-Restart HA, then add the integration from the UI.
+### Entities created
 
-## Configuration
+After setup, these entities are available:
 
-Through the UI only. You'll be asked for :
+| Entity                       | Type           | Description                                   |
+|------------------------------|----------------|-----------------------------------------------|
+| `climate.spa_thermostat`     | climate        | Setpoint control 15.5 to 40 C, step 0.5 C     |
+| `sensor.water_temperature`   | sensor         | Water temp in Celsius                         |
+| `sensor.setpoint`            | sensor         | Thermostat setpoint in Celsius                |
+| `sensor.heating_state`       | sensor         | off / heating / circulation / cooldown        |
+| `binary_sensor.filtration`   | binary_sensor  | Filtration ON/OFF                             |
+| `binary_sensor.heating`      | binary_sensor  | Heating bit ON/OFF                            |
+| `binary_sensor.light`        | binary_sensor  | Light ON/OFF                                  |
+| `switch.spa_light`           | switch         | Light bidirectional                           |
+| `switch.spa_pump_left`       | switch         | Left pump bidirectional                       |
+| `switch.spa_pump_right`      | switch         | Right pump bidirectional                      |
+| `switch.spa_blower`          | switch         | Blower bidirectional                          |
+| `button.filtration`          | button         | Filtration toggle                             |
 
-- **Bridge IP** : the W610 / Elfin / equivalent IP address
-- **TCP port** : default `8899`
+### Known limitation
 
-That's it. The integration probes the bridge before saving and aborts if it
-isn't reachable.
+- LIGHT_ON / LIGHT_OFF frames carry a 17-byte payload instead of 16. CRC validation fails on those two frames only. Replay mode still works correctly.
 
-## How the protocol works
+### Credits
 
-The Joyonway panel broadcasts a status frame (`0xB4`) on the RS-485 bus
-roughly every 500 ms. The integration listens for that frame, decodes a few
-key bytes, and exposes them as HA entities.
+This integration exists thanks to:
 
-Outbound commands are RS-485 frames captured from the original touch panel
-and re-emitted by the integration. The CRC-32 algorithm has been reverse
-engineered (see Credits below), which makes it possible to generate **any**
-setpoint mathematically without having to capture every individual
-temperature first.
+- **@alexbde** - CRC-32 reverse engineering on P25B85 (https://github.com/alexbde/ha-joyonway-p25b85)
+- **@KDy** - unescape table, B4 parser, PB555 manual
+- **@Yannickt26** - P20B29 captures, setpoint frames
+- **@gaet78** - Joyonway HACS pioneer, P69B133 reference
+- **@Neuro** - ESP32 prototype
+- **@old-man** - P25B85 confirmation
 
-For full protocol details see [`docs/protocol.md`](docs/protocol.md).
+Community thread: https://community.home-assistant.io/t/joyonway-spa-control/582344
 
-## Credits
+### License
 
-This integration would not exist without the work of several people on the
-[Home Assistant community thread](https://community.home-assistant.io/t/joyonway-spa-control/582344) :
+MIT
 
-- **@KDy** - pseudo-escape table, broadcast byte map, Python reading script,
-  oscilloscope confirmation of the 38400 baud rate
-- **@alexbde** - reverse-engineered the CRC-32 algorithm (poly `0x04C11DB7`,
-  XorOut `0x552D22C8`, with 32-bit word byte-swap pre-processing)
-- **@Yannickt26** - P20B29 setpoint captures that made the cross-model
-  CRC validation possible
-- **@Neuro**, **@old-man**, **@Gaet78** - additional captures and the related
-  P69B133 integration
+---
 
-The CRC algorithm and pseudo-escape table are direct ports of the algorithms
-documented in that thread. Variable naming and integration design adapted
-for the P23B32 V2 controller.
+## Francais
 
-## License
+### Controleurs supportes
 
-MIT - see [LICENSE](LICENSE).
+| Modele                          | Statut    | Valide par                |
+|---------------------------------|-----------|---------------------------|
+| Joyonway P23B32 V2 (2019)       | Valide    | @KnapTheBuilder           |
+| Joyonway P20B29-2032 V183       | Valide    | @Yannickt26               |
+| Joyonway P25B85                 | Valide    | @KDy, @old-man, @alexbde  |
+
+Les trois partagent le MEME protocole RS485 (delimiteurs 0x1A/0x1D, 38400 bauds, table pseudo-escape KDy, CRC-32 alexbde).
+
+Pour P69B133 (protocole Balboa-like, delimiteurs 0x7E, 115200 bauds, CRC-8), utiliser l'integration @gaet78 : https://github.com/gaet78/homeassistant-joyonway-hacs-
+
+### Fonctionnalites v0.3.0
+
+- **Plateforme Climate** : thermostat HA natif avec ecriture de consigne, plage 15.5 a 40 C, pas de 0.5 C. Consignes generees dynamiquement par l'algorithme CRC-32 @alexbde (fin de la table statique).
+- **Plateforme Sensor** : temperature eau, consigne, etat chauffage, valeurs F brutes.
+- **Plateforme Binary Sensor** : etats filtration, chauffage, lumiere.
+- **Plateforme Switch** : 4 interrupteurs bidirectionnels (lumiere, pompe gauche, pompe droite, blower), etat reflete depuis la trame broadcast.
+- **Plateforme Button** : 9 commandes validees (lumiere, pompes, blower, filtration).
+- **Coordinator** : polling TCP via pont USR-W610 avec unescape KDy correct.
+- **Multi-modeles** : meme integration pour P23B32 V2 / P20B29 / P25B85.
+
+### Pre-requis
+
+**Materiel**
+
+- Pont RS485-WiFi USR-W610 connecte au controleur du spa
+- W610 configure en mode **TCP Transparent** (PAS Modbus)
+- 38400 bauds 8N1
+
+**Configuration du panneau du spa**
+
+Le controle manuel du chauffage necessite : activer **"Thermostat manuel"** dans le menu du panneau PB555. Sans cela, aucun logiciel ne peut piloter le chauffage.
+
+Source : manuel PB555 (francais), cite par @KDy sur le thread communautaire.
+
+### Installation via HACS
+
+1. HACS > Integrations > menu 3 points > Custom repositories
+2. Ajouter `https://github.com/KnapTheBuilder/ha-joyonway-p23b32` comme **Integration**
+3. Installer "Joyonway Spa"
+4. Redemarrer Home Assistant
+5. Parametres > Appareils et services > Ajouter une integration > "Joyonway"
+6. Renseigner l'IP du W610 (port 8899 par defaut)
+
+### Limitation connue
+
+- Les trames LIGHT_ON / LIGHT_OFF embarquent 17 octets de payload au lieu de 16. La validation CRC echoue uniquement sur ces 2 trames. Le mode replay fonctionne correctement.
+
+### Remerciements
+
+Cette integration existe grace a :
+
+- **@alexbde** - Reverse engineering CRC-32 sur P25B85 (https://github.com/alexbde/ha-joyonway-p25b85)
+- **@KDy** - Table d'unescape, parser B4, manuel PB555
+- **@Yannickt26** - Captures P20B29, trames consigne
+- **@gaet78** - Pionnier HACS Joyonway, reference P69B133
+- **@Neuro** - Prototype ESP32
+- **@old-man** - Confirmation P25B85
+
+Thread communautaire : https://community.home-assistant.io/t/joyonway-spa-control/582344
