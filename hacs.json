@@ -1,7 +1,5 @@
 {
-  "name": "Joyonway P23B32 Spa",
-  "content_in_root": false,
-  "country": "FR",
-  "homeassistant": "2024.1.0",
-  "zip_release": false
+  "name": "Joyonway Spa RS485",
+  "render_readme": true,
+  "ignore": ["brands"]
 }
