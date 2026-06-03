@@ -68,3 +68,312 @@ The dashboard uses Mushroom cards, custom button-card, and a circular thermostat
 The USR-W610 connects to the RS485 bus inside the spa controller box:
 
 ```
+Joyonway P23B32 RS485 bus
++--------+--------+
+|   A    |   B    |
++---|----+---|----+
+    |        |
+    |        |
++---v----+---v----+
+|   A    |   B    |   USR-W610
++--------+--------+   (5-30V DC, TCP Server mode, port 8899)
+     | LAN / WiFi
+     v
+Home Assistant
+```
+
+USR-W610 configuration:
+
+- Mode: **TCP Server**
+- Port: **8899**
+- Baud rate: **38400**
+- Data format: **8N1**
+- Static DHCP lease recommended on your router for the W610
+
+---
+
+## Installation
+
+### Via HACS (recommended)
+
+1. Open **HACS** in Home Assistant
+2. Click the three dots in the top right and select **Custom repositories**
+3. Repository URL: `https://github.com/KnapTheBuilder/ha-joyonway-p23b32`
+4. Category: **Integration**
+5. Click **Add**, then find **Joyonway P23B32 Spa** in the HACS list and install
+6. Restart Home Assistant
+
+### Manual
+
+1. Download the latest release from the [Releases page](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/releases)
+2. Extract the archive
+3. Copy `custom_components/joyonway_p23b32/` into your Home Assistant `config/custom_components/` folder
+4. Restart Home Assistant
+
+---
+
+## Configuration
+
+After restart, go to **Settings > Devices & Services > Add integration** and search for **Joyonway**.
+
+Enter:
+
+| Field | Value |
+| --- | --- |
+| IP address | The IP of your USR-W610 on the local network |
+| TCP port | `8899` (default) |
+
+The integration performs a TCP connection test before saving. If the test fails, double-check that the W610 is in TCP Server mode, and that the IP and port are correct.
+
+---
+
+## Entities
+
+### Sensors
+
+| Entity | Description | Unit |
+| --- | --- | --- |
+| `sensor.joyonway_p23b32_water_temperature` | Current water temperature | C |
+| `sensor.joyonway_p23b32_setpoint` | Target temperature setpoint | C |
+
+### Binary sensors
+
+| Entity | Description | Device class |
+| --- | --- | --- |
+| `binary_sensor.joyonway_p23b32_filtration` | Filtration pump active | none |
+| `binary_sensor.joyonway_p23b32_pompe_gauche` | Left jets pump | none |
+| `binary_sensor.joyonway_p23b32_pompe_droite` | Right jets pump | none |
+| `binary_sensor.joyonway_p23b32_bulleur` | Blower (air bubbles) | none |
+| `binary_sensor.joyonway_p23b32_lumiere` | Light | none |
+| `binary_sensor.joyonway_p23b32_chauffage` | Heater active | `heat` |
+| `binary_sensor.joyonway_p23b32_w610_connection` | USR-W610 connectivity | `connectivity` |
+
+### Buttons (one-shot RS485 commands)
+
+| Entity | Action |
+| --- | --- |
+| Light ON / OFF | Toggle the light |
+| Left jets ON / OFF | Toggle the left pump |
+| Right jets ON / OFF | Toggle the right pump |
+| Blower ON / OFF | Toggle the blower |
+| Filtration | Start the filtration cycle |
+| All OFF | Emergency stop for all equipment |
+
+> Replace `joyonway_p23b32` in entity IDs with whatever name HA assigned during setup if you renamed the integration.
+
+---
+
+## Automation examples
+
+These automations are real-world examples inspired by a production install. Adapt the entity IDs to your own setup, the action keys match the integration's button entities.
+
+**1. Daily filtration cycle (summer schedule, 05:00 to 23:00)**
+
+```yaml
+# 2026-05-16 | Automation | Daily filtration start (summer schedule) | Depends on: button.joyonway_p23b32_filtration
+alias: Spa - Filtration start 05:00
+description: Start filtration cycle every morning
+mode: single
+triggers:
+  - trigger: time
+    at: "05:00:00"
+conditions: []
+actions:
+  - action: button.press
+    target:
+      entity_id: button.joyonway_p23b32_filtration
+
+# 2026-05-16 | Automation | Daily filtration stop | Depends on: button.joyonway_p23b32_all_off, binary_sensor.joyonway_p23b32_filtration
+alias: Spa - Filtration stop 23:00
+description: Stop filtration at 23:00 if still active
+mode: single
+triggers:
+  - trigger: time
+    at: "23:00:00"
+conditions:
+  - condition: state
+    entity_id: binary_sensor.joyonway_p23b32_filtration
+    state: "on"
+actions:
+  - action: button.press
+    target:
+      entity_id: button.joyonway_p23b32_all_off
+```
+
+**2. W610 bridge offline notification**
+
+```yaml
+# 2026-05-16 | Automation | W610 offline alert | Depends on: binary_sensor.joyonway_p23b32_w610_connection
+alias: Spa - W610 bridge offline
+description: Notify when the W610 has been offline for 5 minutes
+mode: single
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.joyonway_p23b32_w610_connection
+    to: "off"
+    for:
+      minutes: 5
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: Spa offline
+      message: USR-W610 bridge unreachable for 5 minutes
+```
+
+**3. Heater stuck-on safety**
+
+```yaml
+# 2026-05-16 | Automation | Heater safety timeout | Depends on: binary_sensor.joyonway_p23b32_chauffage, button.joyonway_p23b32_all_off
+alias: Spa - Heater safety timeout
+description: Emergency stop if heater runs more than 4 hours
+mode: single
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.joyonway_p23b32_chauffage
+    to: "on"
+    for:
+      hours: 4
+actions:
+  - action: button.press
+    target:
+      entity_id: button.joyonway_p23b32_all_off
+  - action: notify.mobile_app_your_phone
+    data:
+      title: Spa safety stop
+      message: Heater ran for 4 hours, All OFF triggered
+```
+
+---
+
+## Dashboard example
+
+The screenshot at the top of this README was built with the following community cards. Install them via HACS first:
+
+| Card | HACS name |
+| --- | --- |
+| Mushroom | `piitaya/lovelace-mushroom` |
+| Button card | `custom-cards/button-card` |
+| ApexCharts | `RomRider/apexcharts-card` |
+| Layout card | `thomasloven/lovelace-layout-card` |
+
+A minimal example of the commands tile:
+
+```yaml
+# 2026-05-16 | Lovelace | Spa commands tile | Depends on: integration entities
+type: vertical-stack
+title: Jacuzzi
+cards:
+  - type: custom:mushroom-template-card
+    primary: Filtration
+    secondary: "{{ relative_time(states.binary_sensor.joyonway_p23b32_filtration.last_changed) }}"
+    icon: mdi:pump
+    icon_color: "{{ 'orange' if is_state('binary_sensor.joyonway_p23b32_filtration', 'on') else 'grey' }}"
+    tap_action:
+      action: call-service
+      service: button.press
+      target:
+        entity_id: button.joyonway_p23b32_filtration
+
+  - type: custom:mushroom-template-card
+    primary: Light
+    icon: mdi:lightbulb
+    icon_color: "{{ 'amber' if is_state('binary_sensor.joyonway_p23b32_lumiere', 'on') else 'grey' }}"
+    tap_action:
+      action: call-service
+      service: button.press
+      target:
+        entity_id: >
+          {{ 'button.joyonway_p23b32_lumiere_off' if is_state('binary_sensor.joyonway_p23b32_lumiere', 'on') else 'button.joyonway_p23b32_lumiere_on' }}
+```
+
+---
+
+## Protocol details
+
+The integration speaks directly over TCP with the USR-W610, which forwards raw RS485 frames between Home Assistant and the spa controller.
+
+### Broadcast frame
+
+The P23B32 emits a status broadcast every ~30 seconds with the signature:
+
+```
+1A FF 01 3C D2 B4 FF 08 02
+```
+
+Byte indexing from the start of the signature:
+
+| Byte | Content |
+| --- | --- |
+| 9 | Water temperature in Fahrenheit |
+| 12 | Pump byte 1: bit `0x04` = left jets, bit `0x10` = right jets |
+| 14 | Pump byte 2: bit `0x01` = filtration, bit `0x08` = blower, bit `0x10` = heater |
+| 16 | Setpoint in Fahrenheit |
+| 17 | Light byte: bit `0x01` = light |
+
+### Send commands
+
+Each command is a fixed RS485 frame, sent 10 times with 0.5s interval for reliability. Setpoint frames are generated dynamically from the requested temperature in Fahrenheit.
+
+### Discoveries
+
+- The heater mask was confirmed via a frame where byte 14 = `0x31` = `0x20 + 0x10 + 0x01` (heater + filtration + an unknown flag still active).
+- Filter schedule state appears in bytes 34 to 36 but shows differences between manual and scheduled runs, still under investigation.
+
+---
+
+## Roadmap
+
+- [x] Send commands for light, pumps, blower, filtration, setpoint, all-off
+- [x] Read broadcast status for temperature, setpoint, all states
+- [x] Config flow with TCP connection test
+- [x] English and French translations
+- [x] Brand assets for HACS and HA UI
+- [x] HACS and hassfest validation passing
+- [ ] Native `number` entity for setpoint instead of button presses
+- [ ] Native `climate` entity wrapping setpoint + state + heater
+- [ ] Decode ozonator / UV sanitizer byte (help welcome, open an issue if you can capture frames)
+- [ ] Clarify filter schedule status (bytes 34-36)
+- [ ] Support for additional Joyonway models if community contributes captures
+
+---
+
+## Known limitations
+
+- The **ozonator state** has not been identified yet. If you have a P23B32 with an ozonator, please open an issue with captured RS485 frames.
+- The **filter schedule status** behaves differently between manual and scheduled runs. Investigation is ongoing.
+- This integration is tested only on the **P23B32** model. Other Joyonway models may speak a different RS485 dialect.
+
+---
+
+## Credits
+
+| Contributor | Role |
+| --- | --- |
+| [@KnapTheBuilder](https://github.com/KnapTheBuilder) | Reverse engineering, integration development, hardware validation |
+| [@KDy](https://community.home-assistant.io/u/kdy) | MQTT prototype script, filtration parsing validation |
+| [@Gaet78](https://community.home-assistant.io/u/gaet78) | Earlier HACS integration for the P69B133 model (inspiration) |
+| [@c0mpleX](https://community.home-assistant.io/u/c0mplex) | Hex frame captures and analysis |
+| [@alexbde](https://github.com/alexbde) | CRC-32 reverse engineering, intent queue, P25B85 heater states decoding |
+| [Anthropic Claude](https://www.anthropic.com/claude) | AI pair-programming assistance throughout development |
+
+This project would not exist without the Home Assistant community thread discussions and the open sharing of RS485 captures.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. If you have a Joyonway spa and can capture additional RS485 frames (especially ozonator-related), please open an issue with:
+
+- Your spa model
+- The exact action performed
+- The hex dump of the RS485 frames captured at that moment
+
+---
+
+## License
+
+This project is released under the [MIT License](LICENSE).
+
+---
+
+**Made with care for the Home Assistant community.**
