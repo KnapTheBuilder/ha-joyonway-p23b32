@@ -1,35 +1,4 @@
-# ha-joyonway-p23b32
-
-Home Assistant custom integration for the **Joyonway P23B32** spa controller via RS485 over a **USR-W610** WiFi bridge.
-
-Developed and tested by [@KnapTheBuilder](https://github.com/KnapTheBuilder), with contributions from [@KDy](https://community.home-assistant.io/u/kdy) and [@Gaet78](https://community.home-assistant.io/u/gaet78).
-
-Discussion thread: [JoyOnWay Spa Control — HA Community](https://community.home-assistant.io/t/joyonway-spa-control/582344)
-
----
-
-## Requirements
-
-| Item | Details |
-|---|---|
-| Spa controller | Joyonway P23B32 (physically validated) |
-| RS485 bridge | USR-W610 (WiFi, TCP Server mode, port 8899) |
-| Home Assistant | 2024.1.0 or later |
-| Python | 3.12+ (Python 3.14 asyncio fix included) |
-
----
-
-## Hardware wiring
-
-> **Warning: Opening the spa electrical enclosure is done at your own risk. Always cut the power before any intervention.**
-
-The USR-W610 connects to the RS485 bus inside the spa controller box:
-
-```
-Spa P23B32 RS485 bus  <-->  USR-W610 terminals A / B
-```
-
-Configure the USR-W610 in **TCP Server** mode, port **8899**, baud rate **9600**, 8N1.
+Configure the USR-W610 in **TCP Server** mode, port **8899**, baud rate **38400**, 8N1.
 
 ---
 
