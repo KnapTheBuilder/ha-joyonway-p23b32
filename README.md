@@ -1,4 +1,6 @@
-[![Joyonway P23B32 Logo](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/raw/main/custom_components/joyonway_p23b32/brand/icon@2x.png)](custom_components/joyonway_p23b32/brand/icon@2x.png)
+<div align="center">
+
+<img src="docs/screenshots/joyonway_logo.png" alt="Joyonway Logo" width="120"/>
 
 # Joyonway P23B32 Spa for Home Assistant
 
@@ -12,7 +14,9 @@
 [![Validate with hassfest](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/hassfest.yml/badge.svg)](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/hassfest.yml)
 [![HACS Validation](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/hacs.yml/badge.svg)](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/actions/workflows/hacs.yml)
 
-[Features](#features) · [Showcase](#showcase) · [Install](#installation) · [Config](#configuration) · [Entities](#entities) · [Automations](#automation-examples) · [Dashboard](#dashboard-example) · [Protocol](#protocol-details) · [Roadmap](#roadmap) · [Credits](#credits)
+[Features](#features) · [Showcase](#showcase) · [Install](#installation) · [Hardware](#hardware) · [Config](#configuration) · [Entities](#entities) · [Automations](#automation-examples) · [Protocol](#protocol-details) · [Roadmap](#roadmap) · [Credits](#credits)
+
+</div>
 
 ---
 
@@ -42,11 +46,45 @@ All commands have been reverse-engineered from RS485 captures and physically val
 
 ## Showcase
 
-A real-world dashboard built on top of this integration, with thermostat, command panel, mode presets, EDF Tempo integration, and automatic scheduling:
+A real-world dashboard built on top of this integration, with thermostat, command panel, mode presets, EDF Tempo integration, and automatic scheduling.
 
-[![Joyonway P23B32 Home Assistant dashboard example](https://github.com/KnapTheBuilder/ha-joyonway-p23b32/raw/main/docs/screenshots/dashboard.png)](docs/screenshots/dashboard.png)
+### Main control dashboard
 
-The dashboard uses Mushroom cards, custom button-card, and a circular thermostat card to expose every entity from the integration in a clean, mobile-friendly layout.
+<div align="center">
+<img src="docs/screenshots/dashboard_jacuzzi.png" alt="Joyonway P23B32 Home Assistant main dashboard" width="380"/>
+</div>
+
+Live thermostat with target temperature slider, delta with current water temp, heater idle/active state, three quick presets (30/34, 34/38, 38/40), Veille (standby) and Climate OFF modes, and full equipment control tiles (filtration, light, ozonator, jets, blower).
+
+### Automatic scheduling dashboard
+
+<div align="center">
+<img src="docs/screenshots/dashboard_programmation.png" alt="Joyonway P23B32 Home Assistant scheduling dashboard" width="380"/>
+</div>
+
+Daily filtration window (05:00 to 23:00) combined with two heating plages (11:30-13:00 and 14:00-15:30) for EDF Tempo Blue/White day optimization. Live indication of the current automation phase.
+
+The dashboards use Mushroom cards, custom button-card, and a circular thermostat card to expose every entity from the integration in a clean, mobile-friendly layout.
+
+---
+
+## Hardware
+
+### Joyonway P23B32 control panel
+
+<div align="center">
+<img src="docs/screenshots/control_panel_pb554.png" alt="Joyonway P23B32 PB554 control panel"/>
+</div>
+
+The PB554 control panel on the spa rim. The integration reads the broadcast frames emitted by this controller on the RS485 bus, then injects commands to toggle the same outputs (pumps, blower, light, heater, filtration).
+
+### USR-W610 RS485 to WiFi bridge
+
+<div align="center">
+<img src="docs/screenshots/usr_w610.png" alt="USR-W610 RS232/RS485 to WiFi and Ethernet converter" width="300"/>
+</div>
+
+The USR-W610 is an industrial RS232/RS485 to WiFi and Ethernet converter. Powered in 5-30V DC, configured in TCP Server mode at 38400 8N1, it exposes the spa's RS485 bus as a TCP socket reachable by Home Assistant.
 
 ---
 
@@ -245,49 +283,6 @@ actions:
 
 ---
 
-## Dashboard example
-
-The screenshot at the top of this README was built with the following community cards. Install them via HACS first:
-
-| Card | HACS name |
-| --- | --- |
-| Mushroom | `piitaya/lovelace-mushroom` |
-| Button card | `custom-cards/button-card` |
-| ApexCharts | `RomRider/apexcharts-card` |
-| Layout card | `thomasloven/lovelace-layout-card` |
-
-A minimal example of the commands tile:
-
-```yaml
-# 2026-05-16 | Lovelace | Spa commands tile | Depends on: integration entities
-type: vertical-stack
-title: Jacuzzi
-cards:
-  - type: custom:mushroom-template-card
-    primary: Filtration
-    secondary: "{{ relative_time(states.binary_sensor.joyonway_p23b32_filtration.last_changed) }}"
-    icon: mdi:pump
-    icon_color: "{{ 'orange' if is_state('binary_sensor.joyonway_p23b32_filtration', 'on') else 'grey' }}"
-    tap_action:
-      action: call-service
-      service: button.press
-      target:
-        entity_id: button.joyonway_p23b32_filtration
-
-  - type: custom:mushroom-template-card
-    primary: Light
-    icon: mdi:lightbulb
-    icon_color: "{{ 'amber' if is_state('binary_sensor.joyonway_p23b32_lumiere', 'on') else 'grey' }}"
-    tap_action:
-      action: call-service
-      service: button.press
-      target:
-        entity_id: >
-          {{ 'button.joyonway_p23b32_lumiere_off' if is_state('binary_sensor.joyonway_p23b32_lumiere', 'on') else 'button.joyonway_p23b32_lumiere_on' }}
-```
-
----
-
 ## Protocol details
 
 The integration speaks directly over TCP with the USR-W610, which forwards raw RS485 frames between Home Assistant and the spa controller.
@@ -376,4 +371,8 @@ This project is released under the [MIT License](LICENSE).
 
 ---
 
+<div align="center">
+
 **Made with care for the Home Assistant community.**
+
+</div>
