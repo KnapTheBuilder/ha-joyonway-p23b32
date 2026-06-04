@@ -51,8 +51,10 @@ def build_consigne_frame(temp_f: int) -> bytes:
 # LECTURE BROADCAST (parse trames recues du W610)
 # ============================================================
 # Byte 12: 0x04=pompe_gauche, 0x10=pompe_droite (relatif a byte 0 signature)
-# Byte 14: 0x01=filtration, 0x08=bulleur, 0x10=chauffage
-# Byte 17: 0x01=lumiere
+# 2026-06-04 | FIX filtration | byte 17 bit 0x80 (preuve capture: ON=0xC0 / OFF=0x40)
+#   Ancien byte14 & 0x01 etait faux (byte 14 fige a 0x20, ne suit jamais la pompe).
+# Byte 14: 0x08=bulleur, 0x10=chauffage
+# Byte 17: 0x01=lumiere, 0x80=filtration
 BROADCAST_SIGNATURE = bytes([0x1A, 0xFF, 0x01, 0x3C, 0xD2, 0xB4, 0xFF, 0x08, 0x02])
 FRAME_MIN_LENGTH = 20
 IDX_WATER_TEMP = 9
@@ -62,7 +64,8 @@ IDX_SETPOINT = 16
 IDX_LIGHT_BYTE = 17
 MASK_POMPE_GAUCHE = 0x04
 MASK_POMPE_DROITE = 0x10
-MASK_FILTRATION = 0x01
+IDX_FILTRATION_BYTE = 17
+MASK_FILTRATION = 0x80
 MASK_BULLEUR = 0x08
 # 2026-05-16 FIX: 0x10 confirme par trame heater (byte14=0x31=0x20+0x10+0x01)
 MASK_CHAUFFAGE = 0x10
@@ -127,8 +130,8 @@ def _parse(buf, idx):
         "setpoint":          fahrenheit_to_celsius(sf),
         "pompe_gauche":      bool(pb1 & MASK_POMPE_GAUCHE),
         "pompe_droite":      bool(pb1 & MASK_POMPE_DROITE),
-        # 2026-05-16 FIX: restaure pb2 & MASK_FILTRATION (byte14 bit0x01)
-        "filtration":        bool(pb2 & MASK_FILTRATION),
+        # 2026-06-04 FIX: filtration sur byte 17 bit 0x80 (etait byte14 bit0x01, faux - prouve par capture)
+        "filtration":        bool(buf[idx + IDX_FILTRATION_BYTE] & MASK_FILTRATION),
         "chauffage":         bool(pb2 & MASK_CHAUFFAGE),
         "bulleur":           bool(pb2 & MASK_BULLEUR),
         "lumiere":           bool(lb & MASK_LUMIERE),
