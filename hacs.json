@@ -1,5 +1,21 @@
-{
-  "name": "Joyonway Spa RS485",
-  "render_readme": true,
-  "homeassistant": "2024.1.0"
-}
+name: HACS Validation
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: HACS Action
+        uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands
