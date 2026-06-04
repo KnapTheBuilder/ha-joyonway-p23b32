@@ -31,6 +31,10 @@ All commands have been reverse-engineered from RS485 captures and physically val
 
 > **Discussion thread on HA Community:** [JoyOnWay Spa Control](https://community.home-assistant.io/t/joyonway-spa-control/582344)
 
+<div align="center">
+<img src="docs/screenshots/dashboard_jacuzzi.png" alt="Joyonway P23B32 Home Assistant dashboard" width="380"/>
+</div>
+
 ## Features
 
 - **Fully local control**, no cloud dependency, no internet required
@@ -49,7 +53,19 @@ All commands have been reverse-engineered from RS485 captures and physically val
 
 The PB554 control panel on the spa rim. The integration reads the broadcast frames emitted by this controller on the RS485 bus, then injects commands to toggle the same outputs (pumps, blower, light, filtration).
 
+### Joyonway P23B32 control panel
+
+<div align="center">
+<img src="docs/screenshots/control_panel_pb554.png" alt="Joyonway P23B32 PB554 control panel"/>
+</div>
+
+The PB554 control panel on the spa rim. The integration reads the broadcast frames emitted by this controller and injects commands to toggle the same outputs.
+
 ### USR-W610 RS485 to WiFi bridge
+
+<div align="center">
+<img src="docs/screenshots/usr_w610.png" alt="USR-W610 RS485 to WiFi converter" width="300"/>
+</div>
 
 The USR-W610 is an industrial RS232/RS485 to WiFi and Ethernet converter. Powered in 5-30V DC, configured in TCP Server mode at 38400 8N1, it exposes the spa's RS485 bus as a TCP socket reachable by Home Assistant.
 
