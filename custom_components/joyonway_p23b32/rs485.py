@@ -1,6 +1,12 @@
 # 2026-05-14 | RS485 | Trames d'envoi + lecture broadcast | FIX Python 3.14 asyncio.get_running_loop()
 # 2026-05-16 | FIX | Restauration MASK_CHAUFFAGE=0x10 et filtration=pb2&MASK_FILTRATION
 # 2026-05-27 | v0.3.0 | build_consigne_frame() delegue a crc.py (algorithme @alexbde)
+# 2026-06-07 | v0.3.2 | Decodage octet 14 affine par capture RS485 (2 captures concordantes,
+#   correlation voyants panneau + puissance Shelly mesuree 3411W) :
+#     bit 0x10 = DEMANDE de chauffage (tempo, voyant clignote, resistance pas encore active)
+#     bit 0x04 = chauffage REELLEMENT actif (voyant fixe, ~3400W) -> nouveau "chauffage" fiable
+#     bit 0x80 = ozonateur actif (nouvelle entite "ozone")
+#   Avant : chauffage = bit 0x10, qui passait ON des la demande (tempo) sans chauffe reelle.
 """Trames RS485 Joyonway P23B32 : envoi commandes + lecture broadcast etat."""
 from __future__ import annotations
 
@@ -53,7 +59,9 @@ def build_consigne_frame(temp_f: int) -> bytes:
 # Byte 12: 0x04=pompe_gauche, 0x10=pompe_droite (relatif a byte 0 signature)
 # 2026-06-04 | FIX filtration | byte 17 bit 0x80 (preuve capture: ON=0xC0 / OFF=0x40)
 #   Ancien byte14 & 0x01 etait faux (byte 14 fige a 0x20, ne suit jamais la pompe).
-# Byte 14: 0x08=bulleur, 0x10=chauffage
+# Byte 14 (octet d'etat chauffage/ozone), decode par capture du 2026-06-07 :
+#   0x20 repos | bit 0x10 demande chauffage (tempo) | bit 0x04 chauffe reelle | bit 0x80 ozone
+# Byte 14: 0x08=bulleur
 # Byte 17: 0x01=lumiere, 0x80=filtration
 BROADCAST_SIGNATURE = bytes([0x1A, 0xFF, 0x01, 0x3C, 0xD2, 0xB4, 0xFF, 0x08, 0x02])
 FRAME_MIN_LENGTH = 20
@@ -67,8 +75,11 @@ MASK_POMPE_DROITE = 0x10
 IDX_FILTRATION_BYTE = 17
 MASK_FILTRATION = 0x80
 MASK_BULLEUR = 0x08
-# 2026-05-16 FIX: 0x10 confirme par trame heater (byte14=0x31=0x20+0x10+0x01)
-MASK_CHAUFFAGE = 0x10
+# 2026-06-07 FIX chauffage : l'octet 14 distingue la DEMANDE (0x10, tempo) de la
+#   chauffe REELLE (0x04, resistance active ~3400W). On expose la chauffe reelle.
+MASK_CHAUFFAGE = 0x04            # chauffe reelle (etait 0x10 = demande/tempo, non fiable)
+MASK_CHAUFFAGE_DEMANDE = 0x10    # demande de chauffage (tempo), expose en plus
+MASK_OZONE = 0x80                # ozonateur actif (octet 14)
 MASK_LUMIERE = 0x01
 
 
@@ -132,7 +143,11 @@ def _parse(buf, idx):
         "pompe_droite":      bool(pb1 & MASK_POMPE_DROITE),
         # 2026-06-04 FIX: filtration sur byte 17 bit 0x80 (etait byte14 bit0x01, faux - prouve par capture)
         "filtration":        bool(buf[idx + IDX_FILTRATION_BYTE] & MASK_FILTRATION),
+        # 2026-06-07 FIX: chauffage = chauffe REELLE (bit 0x04), pas la demande (bit 0x10)
         "chauffage":         bool(pb2 & MASK_CHAUFFAGE),
+        "chauffage_demande": bool(pb2 & MASK_CHAUFFAGE_DEMANDE),
+        # 2026-06-07 NEW: ozonateur (bit 0x80 octet 14), confirme par capture
+        "ozone":             bool(pb2 & MASK_OZONE),
         "bulleur":           bool(pb2 & MASK_BULLEUR),
         "lumiere":           bool(lb & MASK_LUMIERE),
         "raw_pb1": pb1, "raw_pb2": pb2, "raw_lb": lb,
